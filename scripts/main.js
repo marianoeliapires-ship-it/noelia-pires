@@ -1,199 +1,242 @@
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/loaders/GLTFLoader.js';
 
-// ======================
+// UI
+document.body.style.margin = "0";
+document.body.style.background = "#bfdfff";
+
 // ESCENA
-// ======================
 const escena = new THREE.Scene();
+escena.background = new THREE.Color(0xbfdfff);
+escena.fog = new THREE.Fog(0xbfdfff, 50, 200);
 
-// 🌅 CIELO
-const canvas = document.createElement('canvas');
-canvas.width = 512;
-canvas.height = 512;
-
-const ctx = canvas.getContext('2d');
-const grad = ctx.createLinearGradient(0, 0, 0, 512);
-
-grad.addColorStop(0, "#ff7e5f");
-grad.addColorStop(1, "#ffd6a5");
-
-ctx.fillStyle = grad;
-ctx.fillRect(0, 0, 512, 512);
-
-escena.background = new THREE.CanvasTexture(canvas);
-
-// ======================
 // CÁMARA
-// ======================
-const camara = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
+const camara = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-// ======================
 // RENDER
-// ======================
-const render = new THREE.WebGLRenderer({
-  canvas: document.getElementById('lienzo'),
-  antialias: true
-});
-render.setSize(window.innerWidth, window.innerHeight);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
 
-// ======================
 // LUCES
-// ======================
 escena.add(new THREE.AmbientLight(0xffffff, 0.6));
 
-const luz = new THREE.DirectionalLight(0xffffff, 1);
-luz.position.set(10, 20, 10);
-escena.add(luz);
+const sol = new THREE.DirectionalLight(0xffffff, 0.8);
+sol.position.set(10, 20, 10);
+escena.add(sol);
 
-// ======================
-// SUELO
-// ======================
-const suelo = new THREE.Mesh(
-  new THREE.PlaneGeometry(10, 100),
-  new THREE.MeshStandardMaterial({ color: 0x1f1f1f })
+// 💙 LUZ NITRO
+const luzNitro = new THREE.PointLight(0x00ccff, 0, 6);
+escena.add(luzNitro);
+
+// 🚗 FAROS
+const faro1 = new THREE.SpotLight(0xffffff, 2, 20, Math.PI / 6, 0.5);
+const faro2 = new THREE.SpotLight(0xffffff, 2, 20, Math.PI / 6, 0.5);
+escena.add(faro1);
+escena.add(faro2);
+
+// 🔴 LUCES TRASERAS
+const luzTrasera1 = new THREE.PointLight(0xff0000, 1, 3);
+const luzTrasera2 = new THREE.PointLight(0xff0000, 1, 3);
+escena.add(luzTrasera1);
+escena.add(luzTrasera2);
+
+// CARRETERA
+const carretera = new THREE.Mesh(
+    new THREE.PlaneGeometry(20, 300),
+    new THREE.MeshStandardMaterial({ color: 0x222222 })
 );
-suelo.rotation.x = -Math.PI / 2;
-escena.add(suelo);
+carretera.rotation.x = -Math.PI / 2;
+carretera.receiveShadow = true;
+escena.add(carretera);
 
-// ======================
-// LÍNEAS
-// ======================
-for (let i = -50; i < 50; i += 5) {
-  const linea = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.3, 2),
-    new THREE.MeshBasicMaterial({ color: 0xffffff })
-  );
-
-  linea.rotation.x = -Math.PI / 2;
-  linea.position.set(0, 0.01, i);
-  escena.add(linea);
+// LINEAS
+for (let i = -150; i < 150; i += 5) {
+    const linea = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.1, 2),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    linea.position.set(0, 0.05, i);
+    escena.add(linea);
 }
 
-// ======================
-// 🚗 COCHE
-// ======================
-let cocheGrupo;
+// VARIABLES
+let coche;
+let velocidad = 0;
+let turboActivo = false;
+let nitro = 100;
 
-const loader = new GLTFLoader();
+const teclas = {};
+let particulas = [];
 
-loader.load('modelos/coche.glb', function (gltf) {
-
-  const modelo = gltf.scene;
-
-  modelo.scale.set(0.6, 0.6, 0.6);
-
-  // 🔥 orientación correcta
-  modelo.rotation.y = Math.PI;
-
-  modelo.position.y = 0.2;
-
-  cocheGrupo = new THREE.Group();
-  cocheGrupo.add(modelo);
-
-  cocheGrupo.position.set(0, 0, 5);
-
-  escena.add(cocheGrupo);
-
-  actualizarCamara();
+// CONTROLES
+window.addEventListener('keydown', (e) => {
+    teclas[e.key] = true;
+    if (e.key === 'Shift') turboActivo = true;
 });
 
-// ======================
-// CONTROLES
-// ======================
-const teclas = {};
-let velocidad = 0;
-let aceleracion = 0.002;
-let maxVelocidad = 0.2;
-let rotacion = 0.03;
+window.addEventListener('keyup', (e) => {
+    teclas[e.key] = false;
+    if (e.key === 'Shift') turboActivo = false;
+});
 
-window.addEventListener('keydown', e => teclas[e.key] = true);
-window.addEventListener('keyup', e => teclas[e.key] = false);
+// COCHE
+const loader = new GLTFLoader();
+loader.load('./modelos/coche.glb', (gltf) => {
+    coche = gltf.scene;
+    coche.scale.set(1.5, 1.5, 1.5);
+    coche.position.y = 0.3;
+    coche.rotation.y = Math.PI;
 
-// ======================
-// MOVIMIENTO PRO
-// ======================
+    coche.traverse(obj => {
+        if (obj.isMesh) obj.castShadow = true;
+    });
+
+    escena.add(coche);
+});
+
+// MOVIMIENTO
 function moverCoche() {
-  if (!cocheGrupo) return;
+    if (!coche) return;
 
-  if (teclas['ArrowUp']) velocidad += aceleracion;
-  else velocidad *= 0.98;
+    let velocidadBase = 0.1;
 
-  if (teclas['ArrowDown']) velocidad -= aceleracion;
+    if (turboActivo && nitro > 0) {
+        velocidadBase = 0.35;
+        nitro -= 0.7;
+    } else {
+        nitro += 0.3;
+    }
 
-  if (teclas['Shift']) maxVelocidad = 0.4;
-  else maxVelocidad = 0.2;
+    nitro = Math.max(0, Math.min(100, nitro));
 
-  velocidad = Math.max(-maxVelocidad, Math.min(maxVelocidad, velocidad));
+    if (teclas['ArrowUp']) velocidad = velocidadBase;
+    else if (teclas['ArrowDown']) velocidad = -velocidadBase;
+    else velocidad *= 0.92;
 
-  // giro
-  if (Math.abs(velocidad) > 0.01) {
-    if (teclas['ArrowLeft']) cocheGrupo.rotation.y += rotacion;
-    if (teclas['ArrowRight']) cocheGrupo.rotation.y -= rotacion;
-  }
+    if (teclas['ArrowLeft']) coche.rotation.y += 0.025;
+    if (teclas['ArrowRight']) coche.rotation.y -= 0.025;
 
-  // movimiento
-  cocheGrupo.position.x += Math.sin(cocheGrupo.rotation.y) * velocidad;
-  cocheGrupo.position.z += Math.cos(cocheGrupo.rotation.y) * velocidad;
-
-  // 🎮 INCLINACIÓN PRO REALISTA
-  let inclinacion = 0;
-
-  if (Math.abs(velocidad) > 0.01) {
-    if (teclas['ArrowLeft']) inclinacion = 0.1;
-    if (teclas['ArrowRight']) inclinacion = -0.1;
-  }
-
-  cocheGrupo.rotation.z = THREE.MathUtils.lerp(
-    cocheGrupo.rotation.z,
-    inclinacion,
-    0.05
-  );
+    coche.position.x -= Math.sin(coche.rotation.y) * velocidad;
+    coche.position.z -= Math.cos(coche.rotation.y) * velocidad;
 }
 
-// ======================
-// CÁMARA PRO (CON ÁNGULO)
-// ======================
+// 💨 HUMO SUAVE (SIN CÍRCULOS FEOS)
+function crearNitro() {
+    if (!coche) return;
+
+    const dirX = Math.sin(coche.rotation.y);
+    const dirZ = Math.cos(coche.rotation.y);
+
+    const lateral = 0.25;
+    const atras = 1.3;
+    const abajo = -0.2;
+
+    for (let i = 0; i < 2; i++) {
+        const lado = i === 0 ? 1 : -1;
+
+        const material = new THREE.MeshBasicMaterial({
+            color: 0xaaaaaa,
+            transparent: true,
+            opacity: 0.4
+        });
+
+        const humo = new THREE.Mesh(
+            new THREE.CircleGeometry(Math.random() * 0.15 + 0.08, 32),
+            material
+        );
+
+        humo.position.set(
+            coche.position.x + dirX * atras + Math.cos(coche.rotation.y) * lateral * lado,
+            coche.position.y + abajo,
+            coche.position.z + dirZ * atras - Math.sin(coche.rotation.y) * lateral * lado
+        );
+
+        humo.lookAt(camara.position);
+
+        escena.add(humo);
+        particulas.push({ mesh: humo, vida: 1 });
+    }
+}
+
+// PARTÍCULAS
+function actualizarParticulas() {
+    particulas.forEach((p, i) => {
+        p.vida -= 0.03;
+
+        p.mesh.material.opacity = p.vida;
+        p.mesh.scale.multiplyScalar(1.04);
+        p.mesh.position.y += 0.01;
+
+        if (p.vida <= 0) {
+            escena.remove(p.mesh);
+            particulas.splice(i, 1);
+        }
+    });
+}
+
+// LUCES COCHE
+function actualizarLuces() {
+    if (!coche) return;
+
+    const dirX = Math.sin(coche.rotation.y);
+    const dirZ = Math.cos(coche.rotation.y);
+
+    faro1.position.set(coche.position.x + dirX, 0.5, coche.position.z + dirZ);
+    faro2.position.set(coche.position.x - dirX, 0.5, coche.position.z + dirZ);
+
+    luzTrasera1.position.set(coche.position.x + dirX, 0.3, coche.position.z - dirZ);
+    luzTrasera2.position.set(coche.position.x - dirX, 0.3, coche.position.z - dirZ);
+}
+
+// CÁMARA
 function actualizarCamara() {
-  if (!cocheGrupo) return;
+    if (!coche) return;
 
-  const distancia = 4;
-  const altura = 1.5;
-  const lateral = 1.5;
+    const distancia = 7;
+    const altura = 3;
 
-  camara.position.x =
-    cocheGrupo.position.x -
-    Math.sin(cocheGrupo.rotation.y) * distancia +
-    Math.cos(cocheGrupo.rotation.y) * lateral;
+    const offsetX = Math.sin(coche.rotation.y) * distancia;
+    const offsetZ = Math.cos(coche.rotation.y) * distancia;
 
-  camara.position.z =
-    cocheGrupo.position.z -
-    Math.cos(cocheGrupo.rotation.y) * distancia -
-    Math.sin(cocheGrupo.rotation.y) * lateral;
+    const objetivo = new THREE.Vector3(
+        coche.position.x + offsetX,
+        coche.position.y + altura,
+        coche.position.z + offsetZ
+    );
 
-  camara.position.y = altura;
-
-  camara.lookAt(
-    cocheGrupo.position.x,
-    cocheGrupo.position.y + 0.5,
-    cocheGrupo.position.z
-  );
+    camara.position.lerp(objetivo, 0.1);
+    camara.lookAt(coche.position);
 }
 
-// ======================
 // LOOP
-// ======================
 function animar() {
-  requestAnimationFrame(animar);
+    requestAnimationFrame(animar);
 
-  moverCoche();
-  actualizarCamara();
+    moverCoche();
+    actualizarLuces();
 
-  render.render(escena, camara);
+    if (turboActivo && nitro > 0) {
+        for (let i = 0; i < 4; i++) crearNitro();
+
+        luzNitro.intensity = 2;
+        luzNitro.position.copy(coche.position);
+    } else {
+        luzNitro.intensity = 0;
+    }
+
+    actualizarParticulas();
+    actualizarCamara();
+
+    renderer.render(escena, camara);
 }
 
 animar();
+
+// RESPONSIVE
+window.addEventListener('resize', () => {
+    camara.aspect = window.innerWidth / window.innerHeight;
+    camara.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
