@@ -67,7 +67,7 @@ const luzTrasera = new THREE.PointLight(0xff0000, 0, 5);
 escena.add(luzTrasera);
 
 // ==========================
-// 🌲 BOSQUE (ARREGLADO PRO)
+// 🌲 BOSQUE
 // ==========================
 
 const loaderBosque = new GLTFLoader();
@@ -76,7 +76,6 @@ let bosqueBase;
 loaderBosque.load('./modelos/bosque.glb', (gltf) => {
     bosqueBase = gltf.scene;
 
-    // 🔥 centrado correcto del modelo
     const box = new THREE.Box3().setFromObject(bosqueBase);
     const centro = box.getCenter(new THREE.Vector3());
     bosqueBase.position.sub(centro);
@@ -92,15 +91,13 @@ loaderBosque.load('./modelos/bosque.glb', (gltf) => {
 function crearBosqueLateral(z, anchoCarretera) {
     if (!bosqueBase) return;
 
-    const margen = 6; // separación real desde borde de piedras
+    const margen = 6;
     const separacion = anchoCarretera + margen;
 
     for (let i = 0; i < 2; i++) {
-
         const lado = i === 0 ? 1 : -1;
 
         const bosque = bosqueBase.clone();
-
         bosque.scale.set(4, 4, 4);
 
         bosque.position.set(
@@ -138,7 +135,6 @@ loaderCarretera.load('./modelos/carretera.glb', (gltf) => {
         if (obj.isMesh) obj.receiveShadow = true;
     });
 
-    // 🔥 ancho REAL tras escalar (CLAVE)
     const boxFinal = new THREE.Box3().setFromObject(modelo);
     const tamaño = boxFinal.getSize(new THREE.Vector3());
 
@@ -157,6 +153,29 @@ loaderCarretera.load('./modelos/carretera.glb', (gltf) => {
         crearBosqueLateral(z, anchoCarretera);
     }
 });
+
+// ==========================
+// 🧱 RAMPA
+// ==========================
+
+const rampaGeometry = new THREE.BoxGeometry(6, 0.8, 12);
+
+const rampaMaterial = new THREE.MeshStandardMaterial({
+    color: 0x2b2b2b,
+    roughness: 0.9,
+    metalness: 0.1
+});
+
+const rampa = new THREE.Mesh(rampaGeometry, rampaMaterial);
+
+rampa.position.set(0, 0.4, -18);
+rampa.rotation.x = Math.PI / 10;
+rampa.rotation.y = Math.PI;
+
+rampa.castShadow = true;
+rampa.receiveShadow = true;
+
+escena.add(rampa);
 
 // ==========================
 // VARIABLES
@@ -225,6 +244,24 @@ function moverCoche() {
 
     coche.position.x -= Math.sin(coche.rotation.y) * velocidad;
     coche.position.z -= Math.cos(coche.rotation.y) * velocidad;
+
+    // ==========================
+    // 🧱 RAMPA SIN VIBRACIÓN
+    // ==========================
+
+    const inicio = rampa.position.z + 6;
+    const fin = rampa.position.z - 6;
+
+    if (coche.position.z < inicio && coche.position.z > fin) {
+
+        const progreso = (coche.position.z - inicio) / (fin - inicio);
+        const altura = Math.max(0, Math.min(1, progreso)) * 2.5;
+
+        coche.position.y = 1 + altura;
+
+    } else {
+        coche.position.y += (1 - coche.position.y) * 0.15;
+    }
 }
 
 // ==========================
