@@ -9,7 +9,6 @@ import { UnrealBloomPass } from 'https://cdn.jsdelivr.net/npm/three@0.158/exampl
 document.body.style.margin = "0";
 document.body.style.background = "#bfdfff";
 
-// HUD
 const hudVelocidad = document.getElementById("velocidad");
 const nitroFill = document.getElementById("nitroFill");
 
@@ -48,23 +47,13 @@ suelo.rotation.x = -Math.PI / 2;
 suelo.position.y = -0.1;
 escena.add(suelo);
 
-// LUCES
+// LUCES GENERALES
 escena.add(new THREE.AmbientLight(0xffffff, 0.5));
 
 const sol = new THREE.DirectionalLight(0xffffff, 0.6);
 sol.position.set(10, 20, 10);
 sol.castShadow = true;
 escena.add(sol);
-
-// FAROS
-const faroIzq = new THREE.SpotLight(0xffffff, 2, 30, Math.PI / 8, 0.5, 1);
-const faroDer = new THREE.SpotLight(0xffffff, 2, 30, Math.PI / 8, 0.5, 1);
-
-escena.add(faroIzq, faroDer, faroIzq.target, faroDer.target);
-
-// LUZ TRASERA
-const luzTrasera = new THREE.PointLight(0xff0000, 0, 5);
-escena.add(luzTrasera);
 
 // ==========================
 // 🌲 BOSQUE
@@ -99,12 +88,7 @@ function crearBosqueLateral(z, anchoCarretera) {
 
         const bosque = bosqueBase.clone();
         bosque.scale.set(4, 4, 4);
-
-        bosque.position.set(
-            lado * separacion,
-            0,
-            z
-        );
+        bosque.position.set(lado * separacion, 0, z);
 
         escena.add(bosque);
     }
@@ -141,11 +125,9 @@ loaderCarretera.load('./modelos/carretera.glb', (gltf) => {
     const longitud = tamaño.z;
     anchoCarretera = tamaño.x / 2;
 
-    const overlap = 0.5;
-
     for (let i = 0; i < 60; i++) {
         const tramo = modelo.clone();
-        const z = -i * (longitud - overlap);
+        const z = -i * (longitud - 0.5);
 
         tramo.position.set(0, 0, z);
         escena.add(tramo);
@@ -155,27 +137,36 @@ loaderCarretera.load('./modelos/carretera.glb', (gltf) => {
 });
 
 // ==========================
-// 🧱 RAMPA
+// 🧱 RAMPAS
 // ==========================
 
-const rampaGeometry = new THREE.BoxGeometry(6, 0.8, 12);
+const rampas = [];
 
-const rampaMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2b2b2b,
-    roughness: 0.9,
-    metalness: 0.1
-});
+function crearRampa(x, z) {
 
-const rampa = new THREE.Mesh(rampaGeometry, rampaMaterial);
+    const geo = new THREE.BoxGeometry(6, 0.8, 12);
+    const mat = new THREE.MeshStandardMaterial({
+        color: 0x2b2b2b,
+        roughness: 0.9,
+        metalness: 0.1
+    });
 
-rampa.position.set(0, 0.4, -18);
-rampa.rotation.x = Math.PI / 10;
-rampa.rotation.y = Math.PI;
+    const rampa = new THREE.Mesh(geo, mat);
 
-rampa.castShadow = true;
-rampa.receiveShadow = true;
+    rampa.position.set(x, 0.4, z);
+    rampa.rotation.x = Math.PI / 10;
+    rampa.rotation.y = 0;
 
-escena.add(rampa);
+    rampa.castShadow = true;
+    rampa.receiveShadow = true;
+
+    escena.add(rampa);
+    rampas.push(rampa);
+}
+
+crearRampa(0, -18);
+crearRampa(0, -60);
+crearRampa(0, -100);
 
 // ==========================
 // VARIABLES
@@ -185,6 +176,13 @@ let coche;
 let velocidad = 0;
 let turboActivo = false;
 let nitro = 100;
+
+let velocidadY = 0;
+let enRampa = false;
+let enElAire = false;
+
+// 🔥 LUCES
+let luzDel1, luzDel2, luzTras1, luzTras2;
 
 const teclas = {};
 let particulas = [];
@@ -210,30 +208,49 @@ loader.load('./modelos/coche.glb', (gltf) => {
 
     coche.scale.set(1.8, 1.8, 1.8);
     coche.position.set(0, 1, 0);
-    coche.rotation.y = 0;
 
     coche.traverse(obj => {
         if (obj.isMesh) obj.castShadow = true;
     });
 
+    // 🔵 LUCES DELANTERAS
+    luzDel1 = new THREE.SpotLight(0x66ccff, 0, 30, Math.PI/8);
+    luzDel2 = new THREE.SpotLight(0x66ccff, 0, 30, Math.PI/8);
+
+    luzDel1.position.set(-0.5, 0.5, 1.5);
+    luzDel2.position.set(0.5, 0.5, 1.5);
+
+    coche.add(luzDel1, luzDel2);
+
+    // 🔴 LUCES TRASERAS
+    luzTras1 = new THREE.PointLight(0xff0000, 0, 5);
+    luzTras2 = new THREE.PointLight(0xff0000, 0, 5);
+
+    luzTras1.position.set(-0.5, 0.3, -1.5);
+    luzTras2.position.set(0.5, 0.3, -1.5);
+
+    coche.add(luzTras1, luzTras2);
+
     escena.add(coche);
 });
 
 // ==========================
-// 🚗 MOVIMIENTO
+// 🚗 MOVIMIENTO + FÍSICA
 // ==========================
 
 function moverCoche() {
     if (!coche) return;
 
-    let velocidadBase = 0.1;
+    let velocidadBase = 0.12;
 
     if (turboActivo && nitro > 0) {
         velocidadBase = 0.35;
-        nitro -= 0.7;
+        nitro -= 1.2;
     } else {
-        nitro += 0.3;
+        nitro += 1.5;
     }
+
+    nitro = Math.max(0, Math.min(100, nitro));
 
     if (teclas['ArrowUp']) velocidad = velocidadBase;
     else if (teclas['ArrowDown']) velocidad = -velocidadBase;
@@ -245,66 +262,123 @@ function moverCoche() {
     coche.position.x -= Math.sin(coche.rotation.y) * velocidad;
     coche.position.z -= Math.cos(coche.rotation.y) * velocidad;
 
-    // ==========================
-    // 🧱 RAMPA SIN VIBRACIÓN
-    // ==========================
-
-    const inicio = rampa.position.z + 6;
-    const fin = rampa.position.z - 6;
-
-    if (coche.position.z < inicio && coche.position.z > fin) {
-
-        const progreso = (coche.position.z - inicio) / (fin - inicio);
-        const altura = Math.max(0, Math.min(1, progreso)) * 2.5;
-
-        coche.position.y = 1 + altura;
-
+    // 🔥 ACTIVAR LUCES
+    if (turboActivo) {
+        luzDel1.intensity = 5;
+        luzDel2.intensity = 5;
+        luzTras1.intensity = 3;
+        luzTras2.intensity = 3;
     } else {
-        coche.position.y += (1 - coche.position.y) * 0.15;
+        luzDel1.intensity *= 0.9;
+        luzDel2.intensity *= 0.9;
+        luzTras1.intensity *= 0.9;
+        luzTras2.intensity *= 0.9;
+    }
+
+    let tocandoRampa = false;
+
+    rampas.forEach(rampa => {
+
+        const inicio = rampa.position.z + 6;
+        const fin = rampa.position.z - 6;
+
+        if (coche.position.z < inicio && coche.position.z > fin) {
+
+            tocandoRampa = true;
+
+            const progreso = (coche.position.z - inicio) / (fin - inicio);
+            const altura = Math.max(0, Math.min(1, progreso)) * 2.2;
+
+            coche.position.y = 1 + altura;
+
+            if (!enRampa) {
+                velocidadY = 0.08 + Math.abs(velocidad) * 0.2;
+            }
+
+            enRampa = true;
+            enElAire = false;
+        }
+    });
+
+    if (!tocandoRampa) {
+
+        enRampa = false;
+
+        if (coche.position.y > 1 || enElAire) {
+
+            enElAire = true;
+
+            velocidadY -= 0.012;
+            coche.position.y += velocidadY;
+
+            if (coche.position.y <= 1) {
+                coche.position.y = 1;
+                velocidadY = 0;
+                enElAire = false;
+            }
+
+        } else {
+            coche.position.y = 1;
+        }
+    }
+
+    // 💨 HUMO
+    if (turboActivo && nitro > 0) {
+
+        for (let i = 0; i < 5; i++) {
+
+            const offsets = [
+                new THREE.Vector3(-0.35, -0.2, -1.2),
+                new THREE.Vector3(0.35, -0.2, -1.2)
+            ];
+
+            offsets.forEach(offsetLocal => {
+
+                const humo = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.08, 8, 8),
+                    new THREE.MeshBasicMaterial({
+                        color: 0x888888,
+                        transparent: true,
+                        opacity: 0.4
+                    })
+                );
+
+                const offset = offsetLocal.clone();
+                offset.applyAxisAngle(new THREE.Vector3(0,1,0), coche.rotation.y);
+
+                humo.position.copy(coche.position).add(offset);
+
+                escena.add(humo);
+
+                particulas.push({
+                    mesh: humo,
+                    vida: 1,
+                    velocidadX: (Math.random() - 0.5) * 0.015,
+                    velocidadZ: (Math.random() - 0.5) * 0.015,
+                    velocidadY: 0.02 + Math.random() * 0.01,
+                    crecimiento: 0.02 + Math.random() * 0.02
+                });
+
+            });
+        }
     }
 }
 
 // ==========================
-// 💨 HUMO
+// PARTÍCULAS
 // ==========================
-
-function crearNitro() {
-    if (!coche) return;
-
-    const humo = new THREE.Mesh(
-        new THREE.CircleGeometry(0.2, 16),
-        new THREE.MeshBasicMaterial({
-            color: 0xcccccc,
-            transparent: true,
-            opacity: 0.6
-        })
-    );
-
-    humo.position.copy(coche.position);
-    escena.add(humo);
-
-    particulas.push({
-        mesh: humo,
-        vida: 1,
-        velocidadX: (Math.random() - 0.5) * 0.05,
-        velocidadZ: (Math.random() - 0.5) * 0.05,
-        crecimiento: 0.02 + Math.random() * 0.02
-    });
-}
 
 function actualizarParticulas() {
     particulas.forEach((p, i) => {
 
-        p.vida -= 0.025;
+        p.vida -= 0.02;
 
-        p.mesh.position.y += 0.02;
+        p.mesh.position.y += p.velocidadY;
         p.mesh.position.x += p.velocidadX;
         p.mesh.position.z += p.velocidadZ;
 
         p.mesh.scale.x += p.crecimiento;
         p.mesh.scale.y += p.crecimiento;
-
-        p.mesh.rotation.z += 0.02;
 
         p.mesh.material.opacity = p.vida;
 
@@ -316,7 +390,7 @@ function actualizarParticulas() {
 }
 
 // ==========================
-// 🎥 CÁMARA
+// CÁMARA
 // ==========================
 
 function actualizarCamara() {
@@ -344,15 +418,12 @@ function animar() {
     requestAnimationFrame(animar);
 
     moverCoche();
-
-    if (turboActivo && nitro > 0) {
-        for (let i = 0; i < 5; i++) crearNitro();
-    }
-
     actualizarParticulas();
     actualizarCamara();
 
-    hudVelocidad.textContent = Math.round(Math.abs(velocidad * 200)) + " km/h";
+    const kmh = Math.round(Math.abs(velocidad * 400));
+    hudVelocidad.textContent = kmh + " km/h";
+
     nitroFill.style.width = nitro + "%";
 
     composer.render();
