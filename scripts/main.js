@@ -1,6 +1,5 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158/build/three.module.js';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/loaders/GLTFLoader.js';
-
 import { EffectComposer } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -8,7 +7,6 @@ import { UnrealBloomPass } from 'https://cdn.jsdelivr.net/npm/three@0.158/exampl
 // UI
 document.body.style.margin = "0";
 document.body.style.background = "#bfdfff";
-
 const hudVelocidad = document.getElementById("velocidad");
 const nitroFill = document.getElementById("nitroFill");
 
@@ -29,12 +27,9 @@ document.body.appendChild(renderer.domElement);
 // POST
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(escena, camara));
-
 const bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    0.3,
-    0.6,
-    0.85
+    0.3, 0.6, 0.85
 );
 composer.addPass(bloomPass);
 
@@ -49,7 +44,6 @@ escena.add(suelo);
 
 // LUCES GENERALES
 escena.add(new THREE.AmbientLight(0xffffff, 0.5));
-
 const sol = new THREE.DirectionalLight(0xffffff, 0.6);
 sol.position.set(10, 20, 10);
 sol.castShadow = true;
@@ -58,7 +52,6 @@ escena.add(sol);
 // ==========================
 // 🌲 BOSQUE
 // ==========================
-
 const loaderBosque = new GLTFLoader();
 let bosqueBase;
 
@@ -97,10 +90,15 @@ function crearBosqueLateral(z, anchoCarretera) {
 // ==========================
 // 🛣️ CARRETERA
 // ==========================
-
 let anchoCarretera = 5;
 
+// 🔴 NUEVO: límite basado en la tercera rampa
+const Z_TERCERA_RAMPA = -100;
+const EXTRA_FINAL = 40;
+const LIMITE_CARRETERA = Z_TERCERA_RAMPA - EXTRA_FINAL;
+
 const loaderCarretera = new GLTFLoader();
+
 loaderCarretera.load('./modelos/carretera.glb', (gltf) => {
 
     const modelo = gltf.scene;
@@ -125,7 +123,11 @@ loaderCarretera.load('./modelos/carretera.glb', (gltf) => {
     const longitud = tamaño.z;
     anchoCarretera = tamaño.x / 2;
 
-    for (let i = 0; i < 60; i++) {
+    let i = 0;
+    let zActual = 0;
+
+    while (zActual > LIMITE_CARRETERA) {
+
         const tramo = modelo.clone();
         const z = -i * (longitud - 0.5);
 
@@ -133,17 +135,18 @@ loaderCarretera.load('./modelos/carretera.glb', (gltf) => {
         escena.add(tramo);
 
         crearBosqueLateral(z, anchoCarretera);
+
+        zActual = z;
+        i++;
     }
 });
 
 // ==========================
 // 🧱 RAMPAS
 // ==========================
-
 const rampas = [];
 
 function crearRampa(x, z) {
-
     const geo = new THREE.BoxGeometry(6, 0.8, 12);
     const mat = new THREE.MeshStandardMaterial({
         color: 0x2b2b2b,
@@ -152,7 +155,6 @@ function crearRampa(x, z) {
     });
 
     const rampa = new THREE.Mesh(geo, mat);
-
     rampa.position.set(x, 0.4, z);
     rampa.rotation.x = Math.PI / 10;
     rampa.rotation.y = 0;
@@ -171,12 +173,10 @@ crearRampa(0, -100);
 // ==========================
 // VARIABLES
 // ==========================
-
 let coche;
 let velocidad = 0;
 let turboActivo = false;
 let nitro = 100;
-
 let velocidadY = 0;
 let enRampa = false;
 let enElAire = false;
@@ -201,8 +201,8 @@ window.addEventListener('keyup', (e) => {
 // ==========================
 // 🚗 COCHE
 // ==========================
-
 const loader = new GLTFLoader();
+
 loader.load('./modelos/coche.glb', (gltf) => {
     coche = gltf.scene;
 
@@ -237,7 +237,6 @@ loader.load('./modelos/coche.glb', (gltf) => {
 // ==========================
 // 🚗 MOVIMIENTO + FÍSICA
 // ==========================
-
 function moverCoche() {
     if (!coche) return;
 
@@ -262,7 +261,7 @@ function moverCoche() {
     coche.position.x -= Math.sin(coche.rotation.y) * velocidad;
     coche.position.z -= Math.cos(coche.rotation.y) * velocidad;
 
-    // 🔥 ACTIVAR LUCES
+    // 🔥 LUCES
     if (turboActivo) {
         luzDel1.intensity = 5;
         luzDel2.intensity = 5;
@@ -278,12 +277,10 @@ function moverCoche() {
     let tocandoRampa = false;
 
     rampas.forEach(rampa => {
-
         const inicio = rampa.position.z + 6;
         const fin = rampa.position.z - 6;
 
         if (coche.position.z < inicio && coche.position.z > fin) {
-
             tocandoRampa = true;
 
             const progreso = (coche.position.z - inicio) / (fin - inicio);
@@ -301,13 +298,10 @@ function moverCoche() {
     });
 
     if (!tocandoRampa) {
-
         enRampa = false;
 
         if (coche.position.y > 1 || enElAire) {
-
             enElAire = true;
-
             velocidadY -= 0.012;
             coche.position.y += velocidadY;
 
@@ -316,7 +310,6 @@ function moverCoche() {
                 velocidadY = 0;
                 enElAire = false;
             }
-
         } else {
             coche.position.y = 1;
         }
@@ -324,16 +317,13 @@ function moverCoche() {
 
     // 💨 HUMO
     if (turboActivo && nitro > 0) {
-
         for (let i = 0; i < 5; i++) {
-
             const offsets = [
                 new THREE.Vector3(-0.35, -0.2, -1.2),
                 new THREE.Vector3(0.35, -0.2, -1.2)
             ];
 
             offsets.forEach(offsetLocal => {
-
                 const humo = new THREE.Mesh(
                     new THREE.SphereGeometry(0.08, 8, 8),
                     new THREE.MeshBasicMaterial({
@@ -358,7 +348,6 @@ function moverCoche() {
                     velocidadY: 0.02 + Math.random() * 0.01,
                     crecimiento: 0.02 + Math.random() * 0.02
                 });
-
             });
         }
     }
@@ -367,10 +356,8 @@ function moverCoche() {
 // ==========================
 // PARTÍCULAS
 // ==========================
-
 function actualizarParticulas() {
     particulas.forEach((p, i) => {
-
         p.vida -= 0.02;
 
         p.mesh.position.y += p.velocidadY;
@@ -392,7 +379,6 @@ function actualizarParticulas() {
 // ==========================
 // CÁMARA
 // ==========================
-
 function actualizarCamara() {
     if (!coche) return;
 
@@ -413,7 +399,6 @@ function actualizarCamara() {
 // ==========================
 // LOOP
 // ==========================
-
 function animar() {
     requestAnimationFrame(animar);
 
@@ -423,7 +408,6 @@ function animar() {
 
     const kmh = Math.round(Math.abs(velocidad * 400));
     hudVelocidad.textContent = kmh + " km/h";
-
     nitroFill.style.width = nitro + "%";
 
     composer.render();
