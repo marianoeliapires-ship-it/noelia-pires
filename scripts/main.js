@@ -15,6 +15,12 @@ const escena = new THREE.Scene();
 escena.background = new THREE.Color(0xbfdfff);
 escena.fog = new THREE.Fog(0xbfdfff, 30, 120);
 
+// 🔥 ATARDECER (AÑADIDO)
+const colorAtardecer = new THREE.Color(0xffb38a);
+const colorFogAtardecer = new THREE.Color(0xffa070);
+let atardecerActivo = false;
+let atardecerProgreso = 0;
+
 // CÁMARA
 const camara = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
@@ -50,10 +56,43 @@ sol.castShadow = true;
 escena.add(sol);
 
 // ==========================
+// 🌅 FUNCIÓN ATARDECER (AÑADIDO)
+// ==========================
+function actualizarAtardecer() {
+    if (!atardecerActivo) return;
+
+    if (atardecerProgreso < 1) {
+        atardecerProgreso += 0.004;
+    }
+
+    escena.background.lerp(colorAtardecer, atardecerProgreso);
+    escena.fog.color.lerp(colorFogAtardecer, atardecerProgreso);
+
+    sol.color.lerp(new THREE.Color(0xffcc99), atardecerProgreso);
+    sol.intensity = THREE.MathUtils.lerp(0.6, 0.4, atardecerProgreso);
+
+    bloomPass.strength = THREE.MathUtils.lerp(0.3, 0.5, atardecerProgreso);
+}
+
+// ==========================
 // 🌲 BOSQUE
 // ==========================
 const loaderBosque = new GLTFLoader();
 let bosqueBase;
+
+// 🔥 AÑADIDO: ANIMALES (NO TOCA NADA EXISTENTE)
+const loaderAnimales = new GLTFLoader();
+let animalesBase = [];
+
+loaderAnimales.load('./modelos/wolf.glb', (gltf) => {
+    animalesBase.push(gltf.scene);
+});
+loaderAnimales.load('./modelos/bear.glb', (gltf) => {
+    animalesBase.push(gltf.scene);
+});
+loaderAnimales.load('./modelos/deer.glb', (gltf) => {
+    animalesBase.push(gltf.scene);
+});
 
 loaderBosque.load('./modelos/bosque.glb', (gltf) => {
     bosqueBase = gltf.scene;
@@ -84,6 +123,34 @@ function crearBosqueLateral(z, anchoCarretera) {
         bosque.position.set(lado * separacion, 0, z);
 
         escena.add(bosque);
+
+        if (animalesBase.length > 0 && Math.random() < 0.3) {
+
+            const base = animalesBase[Math.floor(Math.random() * animalesBase.length)];
+            const animal = base.clone();
+
+            animal.scale.set(1.5, 1.5, 1.5);
+
+            animal.position.set(
+                lado * (separacion + 2 + Math.random() * 3),
+                0,
+                z + (Math.random() * 8 - 4)
+            );
+
+            animal.rotation.y = Math.random() * Math.PI * 2;
+
+            const box = new THREE.Box3().setFromObject(animal);
+            animal.position.y = -box.min.y;
+
+            animal.traverse(obj => {
+                if (obj.isMesh) {
+                    obj.castShadow = true;
+                    obj.receiveShadow = true;
+                }
+            });
+
+            escena.add(animal);
+        }
     }
 }
 
@@ -92,7 +159,6 @@ function crearBosqueLateral(z, anchoCarretera) {
 // ==========================
 let anchoCarretera = 5;
 
-// 🔴 NUEVO: límite basado en la tercera rampa
 const Z_TERCERA_RAMPA = -100;
 const EXTRA_FINAL = 40;
 const LIMITE_CARRETERA = Z_TERCERA_RAMPA - EXTRA_FINAL;
@@ -181,22 +247,24 @@ let velocidadY = 0;
 let enRampa = false;
 let enElAire = false;
 
-// 🔥 LUCES
 let luzDel1, luzDel2, luzTras1, luzTras2;
 
 const teclas = {};
 let particulas = [];
 
 // CONTROLES
+
 window.addEventListener('keydown', (e) => {
     teclas[e.key] = true;
-    if (e.key === 'Shift') turboActivo = true;
+    if (e.code === 'Space') turboActivo = true; // 🔥 CAMBIO
 });
 
 window.addEventListener('keyup', (e) => {
     teclas[e.key] = false;
-    if (e.key === 'Shift') turboActivo = false;
+    if (e.code === 'Space') turboActivo = false; // 🔥 CAMBIO
 });
+
+
 
 // ==========================
 // 🚗 COCHE
@@ -213,7 +281,6 @@ loader.load('./modelos/coche.glb', (gltf) => {
         if (obj.isMesh) obj.castShadow = true;
     });
 
-    // 🔵 LUCES DELANTERAS
     luzDel1 = new THREE.SpotLight(0x66ccff, 0, 30, Math.PI/8);
     luzDel2 = new THREE.SpotLight(0x66ccff, 0, 30, Math.PI/8);
 
@@ -222,7 +289,6 @@ loader.load('./modelos/coche.glb', (gltf) => {
 
     coche.add(luzDel1, luzDel2);
 
-    // 🔴 LUCES TRASERAS
     luzTras1 = new THREE.PointLight(0xff0000, 0, 5);
     luzTras2 = new THREE.PointLight(0xff0000, 0, 5);
 
@@ -260,6 +326,11 @@ function moverCoche() {
 
     coche.position.x -= Math.sin(coche.rotation.y) * velocidad;
     coche.position.z -= Math.cos(coche.rotation.y) * velocidad;
+
+    // 🔥 ACTIVAR ATARDECER (AÑADIDO)
+    if (coche.position.z < -50) {
+        atardecerActivo = true;
+    }
 
     // 🔥 LUCES
     if (turboActivo) {
@@ -405,6 +476,7 @@ function animar() {
     moverCoche();
     actualizarParticulas();
     actualizarCamara();
+    actualizarAtardecer(); // 🔥 añadido
 
     const kmh = Math.round(Math.abs(velocidad * 400));
     hudVelocidad.textContent = kmh + " km/h";
