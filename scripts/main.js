@@ -84,12 +84,7 @@ let bosqueBase;
 const loaderAnimales = new GLTFLoader();
 let animalesBase = [];
 
-loaderAnimales.load('./modelos/wolf.glb', (gltf) => {
-    animalesBase.push(gltf.scene);
-});
-loaderAnimales.load('./modelos/bear.glb', (gltf) => {
-    animalesBase.push(gltf.scene);
-});
+
 loaderAnimales.load('./modelos/deer.glb', (gltf) => {
     animalesBase.push(gltf.scene);
 });
@@ -154,6 +149,9 @@ function crearBosqueLateral(z, anchoCarretera) {
     }
 }
 
+
+
+
 // ==========================
 // 🛣️ CARRETERA
 // ==========================
@@ -162,6 +160,10 @@ let anchoCarretera = 5;
 const Z_TERCERA_RAMPA = -100;
 const EXTRA_FINAL = 40;
 const LIMITE_CARRETERA = Z_TERCERA_RAMPA - EXTRA_FINAL;
+const LIMITE_BOSQUE = Z_TERCERA_RAMPA - 5;
+
+
+
 
 const loaderCarretera = new GLTFLoader();
 
@@ -192,7 +194,7 @@ loaderCarretera.load('./modelos/carretera.glb', (gltf) => {
     let i = 0;
     let zActual = 0;
 
-    while (zActual > LIMITE_CARRETERA) {
+   while (zActual > LIMITE_BOSQUE)  {
 
         const tramo = modelo.clone();
         const z = -i * (longitud - 0.5);
@@ -200,12 +202,79 @@ loaderCarretera.load('./modelos/carretera.glb', (gltf) => {
         tramo.position.set(0, 0, z);
         escena.add(tramo);
 
-        crearBosqueLateral(z, anchoCarretera);
+      if (z > LIMITE_BOSQUE) {
+    crearBosqueLateral(z, anchoCarretera);
+}
 
         zActual = z;
         i++;
     }
 });
+
+// ==========================
+// 🟫 CAMINO DE TIERRA
+// ==========================
+const caminoGeo = new THREE.PlaneGeometry(8, 200);
+const caminoMat = new THREE.MeshStandardMaterial({
+    color: 0x8b5a2b, // marrón tierra
+    roughness: 1
+});
+
+const camino = new THREE.Mesh(caminoGeo, caminoMat);
+
+camino.rotation.x = -Math.PI / 2;
+
+// 📍 empieza donde acaban las piedras
+camino.position.set(
+    0,
+    0.01,
+    LIMITE_BOSQUE - 110
+);
+
+escena.add(camino);
+
+
+
+// ==========================
+// 🌾 HORIZONTE CONTINUO (FULL)
+// ==========================
+const loaderCampo = new GLTFLoader();
+
+loaderCampo.load('./modelos/campo.glb', (gltf) => {
+
+    const base = gltf.scene;
+
+    base.traverse(obj => {
+        if (obj.isMesh) {
+            obj.castShadow = false;
+            obj.receiveShadow = false;
+        }
+    });
+
+    const columnas = 20; // 🔥 MUY ancho (cubre toda pantalla)
+    const filas = 2;     // profundidad justa
+
+    const tamaño = 25;   // 🔥 distancia EXACTA (sin huecos)
+
+    for (let z = 0; z < filas; z++) {
+        for (let x = -columnas/2; x < columnas/2; x++) {
+
+            const campo = base.clone();
+
+            campo.scale.set(14, 14, 14); // 🔥 grande
+
+            campo.position.set(
+                x * tamaño,
+                0,
+                LIMITE_CARRETERA - 70 - (z * tamaño)
+            );
+
+            escena.add(campo);
+        }
+    }
+
+});
+
 
 // ==========================
 // 🧱 RAMPAS
@@ -324,13 +393,33 @@ function moverCoche() {
     if (teclas['ArrowLeft']) coche.rotation.y += 0.025;
     if (teclas['ArrowRight']) coche.rotation.y -= 0.025;
 
-    coche.position.x -= Math.sin(coche.rotation.y) * velocidad;
-    coche.position.z -= Math.cos(coche.rotation.y) * velocidad;
+coche.position.x -= Math.sin(coche.rotation.y) * velocidad;
+coche.position.z -= Math.cos(coche.rotation.y) * velocidad;
+
+// 🛑 LIMITE FINAL (NO PASAR)
+
+// 🛑 LIMITE FINAL + GIRO AUTOMÁTICO
+const limiteFinal = LIMITE_CARRETERA - 50;
+
+if (coche.position.z < limiteFinal) {
+
+    coche.position.z = limiteFinal;
+
+    // 🔥 girar automáticamente
+    coche.rotation.y += 0.05;
+
+    // 🔥 perder velocidad poco a poco
+    velocidad *= 0.9;
+}
+
+
+
 
     // 🔥 ACTIVAR ATARDECER (AÑADIDO)
-    if (coche.position.z < -50) {
-        atardecerActivo = true;
-    }
+   
+if (coche.position.z < Z_TERCERA_RAMPA + 10) {
+    atardecerActivo = true;
+}
 
     // 🔥 LUCES
     if (turboActivo) {
