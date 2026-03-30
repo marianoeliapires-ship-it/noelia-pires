@@ -234,6 +234,112 @@ camino.position.set(
 escena.add(camino);
 
 
+// ==========================
+// 🏖️ TRANSICIÓN ARENA
+// ==========================
+
+const arenaTransicion = new THREE.Mesh(
+    new THREE.PlaneGeometry(50, 150),
+    new THREE.MeshStandardMaterial({
+        color: 0xf2d16b,
+        roughness: 1
+    })
+);
+
+arenaTransicion.rotation.x = -Math.PI / 2;
+
+arenaTransicion.position.set(
+    0,
+    0.02,
+    camino.position.z - 120
+);
+
+
+arenaTransicion.receiveShadow = true;
+
+escena.add(arenaTransicion);
+
+
+// 🏖️ ARENA MÁS CLARA (zona húmeda)
+const arenaSuave = new THREE.Mesh(
+    new THREE.PlaneGeometry(60, 120),
+    new THREE.MeshStandardMaterial({
+        color: 0xf7e4a0,
+        roughness: 1
+    })
+);
+
+arenaSuave.rotation.x = -Math.PI / 2;
+
+arenaSuave.position.set(
+    0,
+    0.03,
+    LIMITE_BOSQUE - 200
+);
+
+escena.add(arenaSuave);
+
+
+
+// ==========================
+// 🏖️ PLAYA 3D (AÑADIDO)
+// ==========================
+
+const loaderPlaya = new GLTFLoader();
+
+loaderPlaya.load('./modelos/playa.glb', (gltf) => {
+
+    const playa = gltf.scene;
+
+    // sombras
+    playa.traverse(obj => {
+        if (obj.isMesh) {
+            obj.castShadow = true;
+            obj.receiveShadow = true;
+        }
+    });
+
+    // 🔥 ESCALA (ajusta si hace falta)
+    playa.scale.set(100, 100, 100);
+
+    // 📍 POSICIÓN (clave)
+   playa.position.set(
+    0, 
+    0,
+    + 180   
+);
+
+    escena.add(playa);
+
+// 🌊 AGUA ENCIMA DE LA PLAYA
+agua = new THREE.Mesh(
+    new THREE.PlaneGeometry(600, 600, 100, 100),
+    new THREE.MeshStandardMaterial({
+        color: 0x4ec1e6,
+        transparent: true,
+        opacity: 0.8,
+        roughness: 0.2,
+        metalness: 0.8
+    })
+);
+
+agua.rotation.x = -Math.PI / 2;
+
+// 📍 AJUSTA ESTO (clave)
+agua.position.set(
+    0,
+    0.5,   // 🔥 un poco por encima de la playa
+    400    // mismo Z que la playa
+);
+
+escena.add(agua);
+
+});
+
+
+
+
+
 
 // ==========================
 // 🌾 HORIZONTE CONTINUO (FULL)
@@ -308,6 +414,8 @@ crearRampa(0, -100);
 // ==========================
 // VARIABLES
 // ==========================
+let tiempo = 0;
+let agua;
 let coche;
 let velocidad = 0;
 let turboActivo = false;
@@ -396,7 +504,6 @@ function moverCoche() {
 coche.position.x -= Math.sin(coche.rotation.y) * velocidad;
 coche.position.z -= Math.cos(coche.rotation.y) * velocidad;
 
-// 🛑 LIMITE FINAL (NO PASAR)
 
 // 🛑 LIMITE FINAL + GIRO AUTOMÁTICO
 const limiteFinal = LIMITE_CARRETERA - 50;
@@ -559,13 +666,34 @@ function actualizarCamara() {
 // ==========================
 // LOOP
 // ==========================
+
 function animar() {
     requestAnimationFrame(animar);
 
     moverCoche();
     actualizarParticulas();
     actualizarCamara();
-    actualizarAtardecer(); // 🔥 añadido
+    actualizarAtardecer();
+
+    // 🌊 OLAS
+    if (agua) {
+        tiempo += 0.05;
+
+        const pos = agua.geometry.attributes.position;
+
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i);
+            const y = pos.getY(i);
+
+            const ola =
+                Math.sin(x * 0.2 + tiempo) * 0.2 +
+                Math.cos(y * 0.3 + tiempo) * 0.2;
+
+            pos.setZ(i, ola);
+        }
+
+        pos.needsUpdate = true;
+    }
 
     const kmh = Math.round(Math.abs(velocidad * 400));
     hudVelocidad.textContent = kmh + " km/h";
@@ -573,5 +701,6 @@ function animar() {
 
     composer.render();
 }
+
 
 animar();
