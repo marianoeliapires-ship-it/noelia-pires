@@ -49,7 +49,7 @@ suelo.position.y = -0.1;
 escena.add(suelo);
 
 // LUCES GENERALES
-escena.add(new THREE.AmbientLight(0xffffff, 0.5));
+escena.add(new THREE.AmbientLight(0xffffff, 0.1));
 const sol = new THREE.DirectionalLight(0xffffff, 0.6);
 sol.position.set(10, 20, 10);
 sol.castShadow = true;
@@ -107,7 +107,7 @@ loaderBosque.load('./modelos/bosque.glb', (gltf) => {
 function crearBosqueLateral(z, anchoCarretera) {
     if (!bosqueBase) return;
 
-    const margen = 6;
+    const margen = 60;
     const separacion = anchoCarretera + margen;
 
     for (let i = 0; i < 2; i++) {
@@ -337,10 +337,6 @@ escena.add(agua);
 });
 
 
-
-
-
-
 // ==========================
 // 🌾 HORIZONTE CONTINUO (FULL)
 // ==========================
@@ -381,14 +377,17 @@ loaderCampo.load('./modelos/campo.glb', (gltf) => {
 
 });
 
+// ==========================
+// 🧱 RAMPAS 
+// ==========================
 
-// ==========================
-// 🧱 RAMPAS
-// ==========================
 const rampas = [];
 
-function crearRampa(x, z) {
-    const geo = new THREE.BoxGeometry(6, 0.8, 12);
+const OFFSET = -1.8; // 👈 IZQUIERDA
+
+function crearRampa(x, z, invertida = false) {
+
+    const geo = new THREE.BoxGeometry(4, 0.8, 15);
     const mat = new THREE.MeshStandardMaterial({
         color: 0x2b2b2b,
         roughness: 0.9,
@@ -396,9 +395,10 @@ function crearRampa(x, z) {
     });
 
     const rampa = new THREE.Mesh(geo, mat);
+
     rampa.position.set(x, 0.4, z);
-    rampa.rotation.x = Math.PI / 10;
-    rampa.rotation.y = 0;
+
+    rampa.rotation.x = invertida ? -Math.PI / 10 : Math.PI / 10;
 
     rampa.castShadow = true;
     rampa.receiveShadow = true;
@@ -407,13 +407,16 @@ function crearRampa(x, z) {
     rampas.push(rampa);
 }
 
-crearRampa(0, -18);
-crearRampa(0, -60);
-crearRampa(0, -100);
+// RAMPAS IZQUIERDA
+crearRampa(OFFSET, -18);
+crearRampa(OFFSET, -60);
+crearRampa(OFFSET, -100);
+
 
 // ==========================
 // VARIABLES
 // ==========================
+let ultimaAlturaRampa = 1;
 let tiempo = 0;
 let agua;
 let coche;
@@ -441,10 +444,8 @@ window.addEventListener('keyup', (e) => {
     if (e.code === 'Space') turboActivo = false; // 🔥 CAMBIO
 });
 
-
-
 // ==========================
-// 🚗 COCHE
+// 🚗 COCHE (CON FAROS BIEN)
 // ==========================
 const loader = new GLTFLoader();
 
@@ -458,16 +459,36 @@ loader.load('./modelos/coche.glb', (gltf) => {
         if (obj.isMesh) obj.castShadow = true;
     });
 
-    luzDel1 = new THREE.SpotLight(0x66ccff, 0, 30, Math.PI/8);
-    luzDel2 = new THREE.SpotLight(0x66ccff, 0, 30, Math.PI/8);
+    // ==========================
+    // 🔥 FAROS DELANTEROS (CORREGIDOS)
+    // ==========================
+   
+luzDel1 = new THREE.SpotLight(0xffffff, 10, 60, Math.PI / 4);
+luzDel2 = new THREE.SpotLight(0xffffff, 10, 60, Math.PI / 4);
 
-    luzDel1.position.set(-0.5, 0.5, 1.5);
-    luzDel2.position.set(0.5, 0.5, 1.5);
+luzDel1.position.set(-0.5, 0.4, 1.5);
+luzDel2.position.set(0.5, 0.4, 1.5);
 
-    coche.add(luzDel1, luzDel2);
+// 👉 apuntar mucho más lejos
+luzDel1.target.position.set(-0.5, 0, 20);
+luzDel2.target.position.set(0.5, 0, 20);
 
-    luzTras1 = new THREE.PointLight(0xff0000, 0, 5);
-    luzTras2 = new THREE.PointLight(0xff0000, 0, 5);
+coche.add(luzDel1.target);
+coche.add(luzDel2.target);
+
+// sombras
+luzDel1.castShadow = true;
+luzDel2.castShadow = true;
+
+coche.add(luzDel1, luzDel2);
+
+
+
+    // ==========================
+    // 🔴 LUCES TRASERAS
+    // ==========================
+    luzTras1 = new THREE.PointLight(0xff0000, 0.8, 4);
+    luzTras2 = new THREE.PointLight(0xff0000, 0.8, 4);
 
     luzTras1.position.set(-0.5, 0.3, -1.5);
     luzTras2.position.set(0.5, 0.3, -1.5);
@@ -476,6 +497,11 @@ loader.load('./modelos/coche.glb', (gltf) => {
 
     escena.add(coche);
 });
+
+
+
+
+
 
 // ==========================
 // 🚗 MOVIMIENTO + FÍSICA
@@ -541,46 +567,82 @@ if (coche.position.z < Z_TERCERA_RAMPA + 10) {
         luzTras2.intensity *= 0.9;
     }
 
-    let tocandoRampa = false;
+// ==========================
+// 🧱 RAMPAS (VERSIÓN PERFECTA)
+// ==========================
 
-    rampas.forEach(rampa => {
-        const inicio = rampa.position.z + 6;
-        const fin = rampa.position.z - 6;
+let tocandoRampa = false;
 
-        if (coche.position.z < inicio && coche.position.z > fin) {
-            tocandoRampa = true;
+rampas.forEach(rampa => {
 
-            const progreso = (coche.position.z - inicio) / (fin - inicio);
-            const altura = Math.max(0, Math.min(1, progreso)) * 2.2;
+    const inicio = rampa.position.z + 2;
+    const fin = rampa.position.z - 6;
 
-            coche.position.y = 1 + altura;
+    // 🔥 además comprobamos X (IMPORTANTE para rampas estrechas)
+    const dentroX = Math.abs(coche.position.x - rampa.position.x) < 1.6;
 
-            if (!enRampa) {
-                velocidadY = 0.08 + Math.abs(velocidad) * 0.2;
-            }
+    if (
+        coche.position.z < inicio &&
+        coche.position.z > fin &&
+        dentroX
+    ) {
 
-            enRampa = true;
+        tocandoRampa = true;
+
+        // 🔥 progreso igual que tu código original
+        const progreso = (coche.position.z - inicio) / (fin - inicio);
+
+        const altura = Math.pow(Math.max(0, Math.min(1, progreso)), 1.5) * 2.2;
+
+        // 🔥 ALTURA SUAVE (clave)
+        const alturaObjetivo = 1 + altura;
+        coche.position.y += (alturaObjetivo - coche.position.y) * 0.3;
+
+        // 🔥 ROTACIÓN SUAVE (clave total)
+        const inclinacionObjetivo = rampa.rotation.x;
+        coche.rotation.x += (inclinacionObjetivo - coche.rotation.x) * 0.15;
+
+        if (!enRampa) {
+            velocidadY = 0.05 + Math.abs(velocidad) * 0.2;
+        }
+
+        enRampa = true;
+        enElAire = false;
+    }
+});
+
+
+// ==========================
+// 🌍 GRAVEDAD NATURAL
+// ==========================
+
+if (!tocandoRampa) {
+
+    enRampa = false;
+
+    // 🔥 volver suave a plano
+    coche.rotation.x *= 0.9;
+
+    if (coche.position.y > 1 || enElAire) {
+
+        enElAire = true;
+
+        velocidadY -= 0.012;
+        coche.position.y += velocidadY;
+
+        if (coche.position.y <= 1) {
+            coche.position.y = 1;
+            velocidadY = 0;
             enElAire = false;
         }
-    });
 
-    if (!tocandoRampa) {
-        enRampa = false;
-
-        if (coche.position.y > 1 || enElAire) {
-            enElAire = true;
-            velocidadY -= 0.012;
-            coche.position.y += velocidadY;
-
-            if (coche.position.y <= 1) {
-                coche.position.y = 1;
-                velocidadY = 0;
-                enElAire = false;
-            }
-        } else {
-            coche.position.y = 1;
-        }
+    } else {
+        coche.position.y = 1;
     }
+}
+
+
+
 
     // 💨 HUMO
     if (turboActivo && nitro > 0) {
@@ -704,3 +766,110 @@ function animar() {
 
 
 animar();
+
+
+
+// ==========================
+// 🧱 LIMITES CARRETERA
+// ==========================
+function limitarCarretera() {
+    if (!coche) return;
+
+    const limite = anchoCarretera - 1;
+
+    if (coche.position.x > limite) coche.position.x = limite;
+    if (coche.position.x < -limite) coche.position.x = -limite;
+}
+
+// ==========================
+// 🌟 FAROLAS CONTROLADAS POR LIMITE
+// ==========================
+const farolas = [];
+
+for (let i = 0; i < 35; i++) {
+
+    const lado = i % 2 === 0 ? 1 : -1;
+
+    const x = lado * (anchoCarretera + 3);
+    const z = -i * 12;
+
+    // 🔥 NO CREAR FAROLAS DESPUÉS DEL LIMITE
+    if (z < LIMITE_CARRETERA) break;
+
+    // 🧱 POSTE
+    const poste = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.1, 0.1, 4),
+        new THREE.MeshStandardMaterial({ color: 0x444444 })
+    );
+
+    poste.position.set(x, 2, z);
+    escena.add(poste);
+
+    // 💡 LUZ
+    const luz = new THREE.PointLight(0xffddaa, 0, 60);
+    luz.position.set(x, 4, z);
+
+    escena.add(luz);
+    farolas.push(luz);
+
+    // 🔥 BOMBILLA
+    const bombilla = new THREE.Mesh(
+        new THREE.SphereGeometry(0.3),
+        new THREE.MeshBasicMaterial({ color: 0xffddaa })
+    );
+
+    bombilla.position.set(x, 4, z);
+    escena.add(bombilla);
+}
+
+
+
+
+// ==========================
+// 🔁 LOOP EXTENDIDO (SIN ROMPER NADA)
+// ==========================
+const animarOriginal = animar;
+
+animar = function() {
+    requestAnimationFrame(animar);
+
+    moverCoche();
+    actualizarParticulas();
+
+    // tu cámara original
+    actualizarCamara();
+
+    limitarCarretera();
+    actualizarAtardecer();
+
+    // 🌆 ENCENDER FAROLAS POCO A POCO
+   farolas.forEach(luz => {
+    luz.intensity = Math.pow(atardecerProgreso, 1.5) * 10;
+});
+
+    // 🌊 OLAS
+    if (agua) {
+        tiempo += 0.05;
+
+        const pos = agua.geometry.attributes.position;
+
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i);
+            const y = pos.getY(i);
+
+            const ola =
+                Math.sin(x * 0.2 + tiempo) * 0.2 +
+                Math.cos(y * 0.3 + tiempo) * 0.2;
+
+            pos.setZ(i, ola);
+        }
+
+        pos.needsUpdate = true;
+    }
+
+    const kmh = Math.round(Math.abs(velocidad * 400));
+    hudVelocidad.textContent = kmh + " km/h";
+    nitroFill.style.width = nitro + "%";
+
+    composer.render();
+};
