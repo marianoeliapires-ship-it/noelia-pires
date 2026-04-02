@@ -118,7 +118,7 @@ export function moverCoche(rampas, onAtardecer) {
     rampas.forEach(rampa => {
         const inicio = rampa.position.z + 2;
         const fin = rampa.position.z - 6;
-        const dentroX = Math.abs(coche.position.x - rampa.position.x) < 1.6;
+        const dentroX = Math.abs(coche.position.x - rampa.position.x) < 4;
 
         if (coche.position.z < inicio && coche.position.z > fin && dentroX) {
             tocandoRampa = true;
@@ -147,7 +147,7 @@ export function moverCoche(rampas, onAtardecer) {
 
         if (coche.position.y > 1 || enElAire) {
             enElAire = true;
-            velocidadY -= 0.012;
+            velocidadY -= 0.01;
             coche.position.y += velocidadY;
 
             if (coche.position.y <= 1) {

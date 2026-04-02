@@ -5,7 +5,7 @@ body {
   font-family: Arial, sans-serif;
 }
 
-/* 🔥 CANVAS FULLSCREEN (FIX DEL CORTE AZUL) */
+/* 🔥 CANVAS FULLSCREEN (CORTE AZUL) */
 canvas {
   display: block;
   position: fixed;
@@ -15,34 +15,3 @@ canvas {
   height: 100%;
 }
 
-/* 🔥 HUD */
-#hud {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  color: white;
-}
-
-/* VELOCIDAD */
-#velocidad {
-  font-size: 32px;
-  font-weight: bold;
-  text-shadow: 0 0 10px rgba(0,0,0,0.7);
-}
-
-/* NITRO */
-#nitroBar {
-  width: 200px;
-  height: 12px;
-  background: rgba(255,255,255,0.2);
-  margin-top: 10px;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-#nitroFill {
-  height: 100%;
-  width: 100%;
-  background: linear-gradient(to right, #00c6ff, #0072ff);
-  transition: width 0.1s;
-}
