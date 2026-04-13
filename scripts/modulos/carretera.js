@@ -5,6 +5,48 @@ import { crearBosqueLateral } from './entorno.js';
 import { getCoche } from './coche.js';
 import { LIMITE_CARRETERA, LIMITE_BOSQUE } from './constantes.js';
 
+export let metaLinea;
+
+export function crearMeta() {
+    const grupoMeta = new THREE.Group();
+
+    const size = 0.5;
+    const filas = 2;
+    const columnas = 12;
+
+    for (let x = 0; x < columnas; x++) {
+        for (let z = 0; z < filas; z++) {
+
+            const esBlanco = (x + z) % 2 === 0;
+
+            const material = new THREE.MeshBasicMaterial({
+                color: esBlanco ? 0xffffff : 0x000000
+            });
+
+            const cuadro = new THREE.Mesh(
+                new THREE.PlaneGeometry(size, size),
+                material
+            );
+
+            cuadro.rotation.x = -Math.PI / 2;
+
+            cuadro.position.set(
+                (x - columnas / 2) * size,
+                0.05,
+                z * size
+            );
+
+            grupoMeta.add(cuadro);
+        }
+    } 
+
+    // 🔥 MÁS ATRÁS
+    grupoMeta.position.set(0, 0, -275);
+
+    escena.add(grupoMeta);
+}
+
+
 export let anchoCarretera = 5;
 export const rampas = [];
 export const farolas = [];

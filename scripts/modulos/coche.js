@@ -3,9 +3,12 @@ import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/js
 import { escena } from './escena.js';
 import { teclas, getTurbo } from './controles.js';
 import { LIMITE_CARRETERA, Z_TERCERA_RAMPA } from './constantes.js';
-import { camara } from './camara.js'; // 🔥 IMPORTANTE
+import { camara } from './camara.js';
+import { decidirMovimientoIA } from './iaGemma.js';
 
 let coche = null;
+let cocheIA = null;
+
 let velocidad = 0;
 let nitro = 100;
 let velocidadY = 0;
@@ -15,14 +18,17 @@ let enElAire = false;
 let luzDel1, luzDel2, luzTras1, luzTras2;
 let particulas = [];
 
+let decisionIA = "recto";
+let tiempoDecision = 0;
+
 const loader = new GLTFLoader();
 
-// 🔥 TEXTURA HUMO
 const texturaHumo = new THREE.TextureLoader().load('./texturas/humo.png');
 
 export function getCoche() { return coche; }
 export function getVelocidad() { return velocidad; }
 export function getNitro() { return nitro; }
+export function getCocheIA() { return cocheIA; }
 
 export function cargarCoche() {
     loader.load('./modelos/coche.glb', (gltf) => {
@@ -35,6 +41,9 @@ export function cargarCoche() {
             if (obj.isMesh) obj.castShadow = true;
         });
 
+
+
+        // LUCES
         luzDel1 = new THREE.SpotLight(0xffffff, 10, 60, Math.PI / 4);
         luzDel2 = new THREE.SpotLight(0xffffff, 10, 60, Math.PI / 4);
 
@@ -61,9 +70,14 @@ export function cargarCoche() {
         coche.add(luzTras1, luzTras2);
 
         escena.add(coche);
+
+        console.log("🚗 Coche jugador creado");
     });
 }
 
+
+
+// 🚗 TU CÓDIGO ORIGINAL
 export function moverCoche(rampas, onAtardecer) {
     if (!coche) return;
 
@@ -159,47 +173,6 @@ export function moverCoche(rampas, onAtardecer) {
             coche.position.y = 1;
         }
     }
-
-    // 🔥 HUMO REAL CON TEXTURA
-    if (turboActivo && nitro > 0) {
-        for (let i = 0; i < 4; i++) {
-
-            const offsets = [
-                new THREE.Vector3(-0.4, -0.2, -1.2),
-                new THREE.Vector3(0.4, -0.2, -1.2)
-            ];
-
-            offsets.forEach(offsetLocal => {
-
-                const humo = new THREE.Mesh(
-                    new THREE.PlaneGeometry(0.6, 0.6),
-                    new THREE.MeshBasicMaterial({
-                        map: texturaHumo,
-                        transparent: true,
-                        opacity: 0.4,
-                        depthWrite: false
-                    })
-                );
-
-                humo.rotation.z = Math.random() * Math.PI;
-
-                const offset = offsetLocal.clone();
-                offset.applyAxisAngle(new THREE.Vector3(0,1,0), coche.rotation.y);
-
-                humo.position.copy(coche.position).add(offset);
-                escena.add(humo);
-
-                particulas.push({
-                    mesh: humo,
-                    vida: 1,
-                    velocidadX: (Math.random() - 0.5) * 0.01,
-                    velocidadZ: (Math.random() - 0.5) * 0.01,
-                    velocidadY: 0.01 + Math.random() * 0.015,
-                    crecimiento: 0.02 + Math.random() * 0.04
-                });
-            });
-        }
-    }
 }
 
 export function actualizarParticulas() {
@@ -218,7 +191,7 @@ export function actualizarParticulas() {
         p.mesh.scale.y += p.crecimiento;
         p.mesh.scale.z = p.mesh.scale.x;
 
-        p.mesh.lookAt(camara.position); // 🔥 clave
+        p.mesh.lookAt(camara.position);
 
         p.mesh.material.opacity = p.vida * 0.5;
 

@@ -1,0 +1,26 @@
+{
+  "name": "noelia-pires",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marianoeliapires-ship-it/noelia-pires.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/marianoeliapires-ship-it/noelia-pires/issues"
+  },
+  "homepage": "https://github.com/marianoeliapires-ship-it/noelia-pires#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "node-fetch": "^3.3.2"
+  }
+}
