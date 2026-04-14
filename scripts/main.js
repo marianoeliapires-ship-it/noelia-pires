@@ -121,15 +121,15 @@ iniciarCuentaAtras();
 function animar() {
     requestAnimationFrame(animar);
 
-if (carreraTerminada) return;
+    if (carreraTerminada) return;
 
     const coche = getCoche();
     const ia = getCocheIA();
 
-   if (juegoIniciado) {
-    moverCoche(rampas, activarAtardecer);
-    moverCocheIA();
-}
+    if (juegoIniciado) {
+        moverCoche(rampas, activarAtardecer);
+        moverCocheIA();
+    }
 
     // partículas
     actualizarParticulas();
