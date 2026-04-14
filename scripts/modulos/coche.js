@@ -21,17 +21,77 @@ let particulas = [];
 let decisionIA = "recto";
 let tiempoDecision = 0;
 
+// 🔥 CONTROL HUMO
+let ultimoHumo = 0;
+const INTERVALO_HUMO = 80;
+const MAX_PARTICULAS = 80;
+
 const loader = new GLTFLoader();
 
+// 💨 TEXTURA HUMO
 const texturaHumo = new THREE.TextureLoader().load('./texturas/humo.png');
+
+// 🔥 FUNCIÓN HUMO REALISTA
+function crearHumo(offsetSide = 0) {
+
+    if (!coche) return;
+
+    // 🔥 LIMITE DE PARTÍCULAS
+    if (particulas.length > MAX_PARTICULAS) {
+        const vieja = particulas.shift();
+        escena.remove(vieja.mesh);
+    }
+
+    const geo = new THREE.PlaneGeometry(1, 1);
+
+    const mat = new THREE.MeshBasicMaterial({
+        map: texturaHumo,
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false
+    });
+
+    const humo = new THREE.Mesh(geo, mat);
+
+    humo.position.copy(coche.position);
+
+    const offsetAtras = 1.7;
+
+    // 🔥 ALTURA ESCAPE
+    humo.position.y -= 0.35;
+
+    // 🔥 DETRÁS DEL COCHE
+    humo.position.x += Math.sin(coche.rotation.y) * offsetAtras;
+    humo.position.z += Math.cos(coche.rotation.y) * offsetAtras;
+
+    // 🔥 DOBLE ESCAPE
+    humo.position.x += Math.cos(coche.rotation.y) * offsetSide;
+
+    // 🔥 DIRECCIÓN REAL
+    const dirX = -Math.sin(coche.rotation.y);
+    const dirZ = -Math.cos(coche.rotation.y);
+
+    escena.add(humo);
+
+    particulas.push({
+        mesh: humo,
+        vida: 1,
+        velocidadX: dirX * 0.12 + (Math.random() - 0.5) * 0.06,
+        velocidadY: Math.random() * 0.02,
+        velocidadZ: dirZ * 0.12 + (Math.random() - 0.5) * 0.06,
+        crecimiento: 0.035
+    });
+}
 
 export function getCoche() { return coche; }
 export function getVelocidad() { return velocidad; }
 export function getNitro() { return nitro; }
 export function getCocheIA() { return cocheIA; }
 
+// 🚗 CARGAR COCHE
 export function cargarCoche() {
     loader.load('./modelos/coche.glb', (gltf) => {
+
         coche = gltf.scene;
 
         coche.scale.set(1.8, 1.8, 1.8);
@@ -41,9 +101,7 @@ export function cargarCoche() {
             if (obj.isMesh) obj.castShadow = true;
         });
 
-
-
-        // LUCES
+        // 🔦 LUCES DELANTERAS
         luzDel1 = new THREE.SpotLight(0xffffff, 10, 60, Math.PI / 4);
         luzDel2 = new THREE.SpotLight(0xffffff, 10, 60, Math.PI / 4);
 
@@ -61,6 +119,7 @@ export function cargarCoche() {
 
         coche.add(luzDel1, luzDel2);
 
+        // 🔴 LUCES TRASERAS
         luzTras1 = new THREE.PointLight(0xff0000, 0.8, 4);
         luzTras2 = new THREE.PointLight(0xff0000, 0.8, 4);
 
@@ -75,9 +134,7 @@ export function cargarCoche() {
     });
 }
 
-
-
-// 🚗 TU CÓDIGO ORIGINAL
+// 🚗 MOVIMIENTO + TURBO + HUMO PRO
 export function moverCoche(rampas, onAtardecer) {
     if (!coche) return;
 
@@ -87,6 +144,16 @@ export function moverCoche(rampas, onAtardecer) {
     if (turboActivo && nitro > 0) {
         velocidadBase = 0.35;
         nitro -= 1.2;
+
+        // 💨 HUMO CONTROLADO (SIN TIRONES)
+        const ahora = Date.now();
+
+        if (ahora - ultimoHumo > INTERVALO_HUMO) {
+            crearHumo(0.35);
+            crearHumo(-0.35);
+            ultimoHumo = ahora;
+        }
+
     } else {
         nitro += 1.5;
     }
@@ -115,6 +182,7 @@ export function moverCoche(rampas, onAtardecer) {
         onAtardecer();
     }
 
+    // 🔥 LUCES TURBO
     if (turboActivo) {
         luzDel1.intensity = 5;
         luzDel2.intensity = 5;
@@ -165,7 +233,7 @@ export function moverCoche(rampas, onAtardecer) {
             coche.position.y += velocidadY;
 
             if (coche.position.y <= 1) {
-                coche.position.y = 1;
+                coche.position.y = 0.5;
                 velocidadY = 0;
                 enElAire = false;
             }
@@ -175,6 +243,7 @@ export function moverCoche(rampas, onAtardecer) {
     }
 }
 
+// 💨 ACTUALIZAR PARTÍCULAS
 export function actualizarParticulas() {
     particulas.forEach((p, i) => {
 
@@ -184,8 +253,10 @@ export function actualizarParticulas() {
         p.mesh.position.x += p.velocidadX;
         p.mesh.position.z += p.velocidadZ;
 
-        p.velocidadX *= 0.98;
-        p.velocidadZ *= 0.98;
+        // 🔥 física realista
+        p.velocidadX *= 0.96;
+        p.velocidadZ *= 0.96;
+        p.velocidadY *= 0.97;
 
         p.mesh.scale.x += p.crecimiento;
         p.mesh.scale.y += p.crecimiento;
@@ -193,7 +264,8 @@ export function actualizarParticulas() {
 
         p.mesh.lookAt(camara.position);
 
-        p.mesh.material.opacity = p.vida * 0.5;
+        // 🔥 fade pro
+        p.mesh.material.opacity = p.vida * p.vida;
 
         if (p.vida <= 0) {
             escena.remove(p.mesh);

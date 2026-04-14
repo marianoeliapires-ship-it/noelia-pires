@@ -10,43 +10,47 @@ import { cargarEntorno, actualizarAgua } from './modulos/entorno.js';
 import { cargarCarretera, limitarCarretera, actualizarFarolas, rampas } from './modulos/carretera.js';
 import { actualizarAtardecer, activarAtardecer, getAtardecerProgreso } from './modulos/atardecer.js';
 
-// 🔥 IA (SOLO UNA VEZ)
 import { cargarCocheIA, moverCocheIA, getCocheIA } from './modulos/cocheIA.js';
 import { crearMeta } from './modulos/carretera.js';
 
+import { crearBotonRestart, mostrarBotonRestart } from './modulos/boton.js';
+import { crearMenu } from './modulos/menu.js';
+import { crearBotonMenu } from './modulos/botonmenu.js';
 
-const winnerText = document.createElement("div");
-winnerText.style.position = "absolute";
-winnerText.style.top = "40%";
-winnerText.style.width = "100%";
-winnerText.style.textAlign = "center";
-winnerText.style.fontSize = "60px";
-winnerText.style.color = "yellow";
-winnerText.style.fontWeight = "bold";
-winnerText.style.display = "none";
-winnerText.innerText = "WINNER 🏆";
-
-document.body.appendChild(winnerText);
-
-
-// UI
-document.body.style.margin = "0";
-document.body.style.background = "#bfdfff";
-
-const hudVelocidad = document.getElementById("velocidad");
-const nitroFill = document.getElementById("nitroFill");
-
-// 🏁 CARTEL RESULTADO
+// UI RESULTADO
 const resultado = document.createElement("div");
 resultado.style.position = "absolute";
 resultado.style.top = "40%";
 resultado.style.width = "100%";
 resultado.style.textAlign = "center";
-resultado.style.fontSize = "50px";
-resultado.style.color = "white";
+resultado.style.fontSize = "60px";
 resultado.style.fontWeight = "bold";
+resultado.style.fontFamily = "Consolas, monospace";
 resultado.style.display = "none";
+resultado.style.zIndex = "9999";
 document.body.appendChild(resultado);
+
+// TEXTO PAUSA
+const pausaTexto = document.createElement("div");
+pausaTexto.innerText = "PAUSED";
+pausaTexto.style.position = "absolute";
+pausaTexto.style.top = "40%";
+pausaTexto.style.width = "100%";
+pausaTexto.style.textAlign = "center";
+pausaTexto.style.fontSize = "80px";
+pausaTexto.style.fontFamily = "Consolas, monospace";
+pausaTexto.style.color = "#FFD700";
+pausaTexto.style.textShadow = "0 0 10px #FFD700";
+pausaTexto.style.display = "none";
+pausaTexto.style.zIndex = "9999";
+document.body.appendChild(pausaTexto);
+
+// HUD
+document.body.style.margin = "0";
+document.body.style.background = "#bfdfff";
+
+const hudVelocidad = document.getElementById("velocidad");
+const nitroFill = document.getElementById("nitroFill");
 
 // RENDER
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -54,7 +58,6 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-// POST
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(escena, camara));
 
@@ -65,29 +68,45 @@ const bloomPass = new UnrealBloomPass(
 
 composer.addPass(bloomPass);
 
-// 🔥 INIT
+// INIT
 cargarEntorno();
 cargarCarretera();
 cargarCoche();
 cargarCocheIA();
 crearMeta();
 
+crearBotonRestart();
+crearBotonMenu(volverAlMenu);
+
 let tiempo = 0;
 let carreraTerminada = false;
 let juegoIniciado = false;
 let cuentaAtras = 3;
+let modoCinematica = false;
+let modoJuego = null;
+let juegoPausado = false; 
 
+// DETECTAR ESC
+window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        juegoPausado = !juegoPausado;
+        pausaTexto.style.display = juegoPausado ? "block" : "none";
+    }
+});
 
+// CUENTA ATRÁS
 const salida = document.createElement("div");
 salida.style.position = "absolute";
 salida.style.top = "30%";
 salida.style.width = "100%";
 salida.style.textAlign = "center";
 salida.style.fontSize = "80px";
-salida.style.color = "yellow";
 salida.style.fontWeight = "bold";
+salida.style.fontFamily = "Consolas, monospace";
+salida.style.color = "#FFD700";
+salida.style.textShadow = "0 0 10px #FFD700, 0 0 20px #FFA500";
+salida.style.zIndex = "9999";
 document.body.appendChild(salida);
-
 
 function iniciarCuentaAtras() {
     const intervalo = setInterval(() => {
@@ -109,97 +128,125 @@ function iniciarCuentaAtras() {
     }, 1000);
 }
 
-iniciarCuentaAtras();
+// MENÚ INICIAL
+crearMenu((modo) => {
+    modoJuego = modo;
+    iniciarCuentaAtras();
+});
 
+// VOLVER AL MENÚ
+function volverAlMenu() {
 
+    carreraTerminada = false;
+    juegoIniciado = false;
+    modoCinematica = false;
 
+    resultado.style.display = "none";
+    salida.style.display = "block";
 
+    cuentaAtras = 3;
 
-// ==========================
-// 🔁 LOOP PRINCIPAL
-// ==========================
+    const coche = getCoche();
+    const ia = getCocheIA();
+
+    if (coche) coche.position.set(0, 1, 5);
+    if (ia) ia.position.set(2, 1, 2);
+
+    crearMenu((modo) => {
+        modoJuego = modo;
+        iniciarCuentaAtras();
+    });
+}
+
+// LOOP
 function animar() {
     requestAnimationFrame(animar);
 
-    if (carreraTerminada) return;
+    // BLOQUEO POR PAUSA
+    if (juegoPausado) {
+        composer.render();
+        return;
+    }
 
     const coche = getCoche();
     const ia = getCocheIA();
 
     if (juegoIniciado) {
-        moverCoche(rampas, activarAtardecer);
-        moverCocheIA();
+
+        if (!carreraTerminada) {
+            moverCoche(rampas, activarAtardecer);
+        }
+
+        if (modoJuego === "ia") {
+            moverCocheIA(rampas);
+        }
     }
 
-    // partículas
     actualizarParticulas();
-
-    // cámara
     actualizarCamara(coche);
-
-    // límites
     limitarCarretera();
 
-    // luces
     actualizarAtardecer(bloomPass);
     actualizarFarolas(getAtardecerProgreso());
 
-    // agua
     tiempo += 0.05;
     actualizarAgua(tiempo);
 
-    // UI
     const kmh = Math.round(Math.abs(getVelocidad() * 400));
     hudVelocidad.textContent = kmh + " km/h";
     nitroFill.style.width = getNitro() + "%";
 
-    // 🏁 META (AQUÍ ES DONDE TIENE QUE ESTAR)
-    const meta = -500;
+    const meta = -275;
 
-    if (!carreraTerminada && coche && ia) {
+    if (!carreraTerminada && coche && coche.position.z <= meta) {
+        resultado.innerText = "🏆 WINNER";
+        resultado.style.color = "#FFD700";
+        resultado.style.display = "block";
 
-        if (coche.position.z < meta) {
-            resultado.innerText = "🏆 HAS GANADO";
-            resultado.style.display = "block";
-            carreraTerminada = true;
-        }
+        mostrarBotonRestart();
 
-        if (ia.position.z < meta) {
-            resultado.innerText = "💀 HAS PERDIDO";
-            resultado.style.display = "block";
-            carreraTerminada = true;
+        coche.position.z = meta;
+
+        carreraTerminada = true;
+        modoCinematica = true;
+    }
+
+    if (!carreraTerminada && ia && ia.position.z <= meta) {
+        resultado.innerText = "💀 LOSER";
+        resultado.style.color = "red";
+        resultado.style.display = "block";
+
+        mostrarBotonRestart();
+
+        ia.position.z = meta;
+
+        carreraTerminada = true;
+        modoCinematica = true;
+    }
+
+    if (carreraTerminada) {
+        if (coche) coche.position.x += (-1.5 - coche.position.x) * 0.05;
+        if (ia) ia.position.x += (1.5 - ia.position.x) * 0.05;
+    }
+
+    if (modoCinematica) {
+
+        const objetivo = coche && coche.position.z <= meta ? coche : ia;
+
+        if (objetivo) {
+            const t = Date.now() * 0.001;
+
+            camara.position.x = objetivo.position.x + Math.sin(t) * 5;
+            camara.position.z = objetivo.position.z + Math.cos(t) * 5;
+            camara.position.y = 3;
+
+            camara.lookAt(objetivo.position);
+
+            camara.position.y += (2 - camara.position.y) * 0.05;
         }
     }
 
-    // render
     composer.render();
 }
-
-const coche = getCoche();
-const ia = getCocheIA();
-
-const meta = -200; // 👈 usa tu valor real
-
-if (!carreraTerminada && coche && ia) {
-
-    // 🚗 jugador gana
-    if (coche.position.z < meta) {
-        winnerText.innerText = "🏆 WINNER";
-        winnerText.style.display = "block";
-        carreraTerminada = true;
-    }
-
-    // 🤖 IA gana
-    if (ia.position.z < meta) {
-        winnerText.innerText = "🤖 IA WINNER";
-        winnerText.style.display = "block";
-        carreraTerminada = true;
-    }
-}
-
-
-
-
-
 
 animar();
