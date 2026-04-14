@@ -13,7 +13,7 @@ export function cargarCocheIA() {
     console.log("Cargando modelo IA...");
 
     loader.load(
-        '../modelos/cocheIA.glb', // 👈 RUTA CORRECTA
+        './modelos/cocheIA.glb', // 👈 RUTA CORRECTA
 
         (gltf) => {
             console.log("✅ MODELO IA CARGADO");
