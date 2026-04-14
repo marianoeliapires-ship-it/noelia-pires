@@ -4,7 +4,7 @@ import { escena } from './escena.js';
 import { teclas, getTurbo } from './controles.js';
 import { LIMITE_CARRETERA, Z_TERCERA_RAMPA } from './constantes.js';
 import { camara } from './camara.js';
-import { decidirMovimientoIA } from './iaGemma.js';
+import { decidirMovimientoIA } from './iacoche.js';
 
 let coche = null;
 let cocheIA = null;

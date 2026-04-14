@@ -2,6 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158/build/three.mod
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.158/examples/jsm/loaders/GLTFLoader.js';
 import { escena } from './escena.js';
 import { getCoche } from './coche.js';
+import { decidirMovimientoIA } from './iacoche.js';
 
 let cocheIA = null;
 
@@ -36,8 +37,8 @@ export function cargarCocheIA() {
     window.cocheIA = cocheIA;
 }
 
-// 🤖 IA CON RAMPAS + COLISIÓN
-export function moverCocheIA(rampas) {
+// 🤖 IA CON RAMPAS + COLISIÓN + DECISIONES
+export async function moverCocheIA(rampas) {
     if (!cocheIA) return;
 
     const jugador = getCoche();
@@ -45,7 +46,22 @@ export function moverCocheIA(rampas) {
 
     const meta = -275;
 
+    // ==========================
+    // 🧠 ESTADO IA
+    // ==========================
+    const estado = {
+        x: cocheIA.position.x,
+        z: cocheIA.position.z,
+        nitro: 100,
+        obstaculoIzquierda: false,
+        obstaculoDerecha: false
+    };
+
+    const decision = await decidirMovimientoIA(estado);
+
+    // ==========================
     // 🚗 VELOCIDAD
+    // ==========================
     const distanciaMeta = Math.abs(cocheIA.position.z - meta);
     let velocidad = 0.25;
 
@@ -59,15 +75,30 @@ export function moverCocheIA(rampas) {
         cocheIA.position.z -= velocidad;
     }
 
+    // ==========================
     // 🎯 SEGUIR JUGADOR
+    // ==========================
     const diferenciaX = jugador.position.x - cocheIA.position.x;
     cocheIA.position.x += diferenciaX * 0.05;
 
+    // ==========================
+    // 🧠 DECISIONES IA
+    // ==========================
+    if (decision === "izquierda") {
+        cocheIA.position.x -= 0.12;
+    }
+
+    if (decision === "derecha") {
+        cocheIA.position.x += 0.12;
+    }
+
+    // ==========================
     // 🚧 LÍMITES
+    // ==========================
     cocheIA.position.x = Math.max(-3, Math.min(3, cocheIA.position.x));
 
     // ==========================
-    // 🏔️ RAMPAS (CLAVE)
+    // 🏔️ RAMPAS
     // ==========================
     let tocandoRampa = false;
 
