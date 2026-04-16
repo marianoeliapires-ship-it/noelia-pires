@@ -26,7 +26,7 @@ export function crearMenu(iniciarJuegoCallback) {
 
     //  BOTÓN SOLO
     const soloBtn = document.createElement("button");
-    soloBtn.innerText = "CARRERA LIBRE";
+    soloBtn.innerText = "1 PLAYER";
     estiloBoton(soloBtn);
 
     soloBtn.onclick = () => {
@@ -37,7 +37,7 @@ export function crearMenu(iniciarJuegoCallback) {
 
     //  BOTÓN IA
     const iaBtn = document.createElement("button");
-    iaBtn.innerText = "CARRERA CONTRA IA"
+    iaBtn.innerText = "CARRERA VS CPU"
     estiloBoton(iaBtn);
 
     iaBtn.onclick = () => {

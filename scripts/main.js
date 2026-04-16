@@ -16,8 +16,34 @@ import { crearMeta } from './modulos/carretera.js';
 import { crearBotonRestart, mostrarBotonRestart } from './modulos/boton.js';
 import { crearMenu } from './modulos/menu.js';
 import { crearBotonMenu } from './modulos/botonmenu.js';
+import { comentarCarreraIA } from "./modulos/ia.js";
 
-// UI RESULTADO
+
+// 🎙️ VOZ
+function hablarPro(texto) {
+    if (!texto) return;
+
+    const speech = new SpeechSynthesisUtterance(texto);
+    const voces = speechSynthesis.getVoices();
+
+    const voz = voces.find(v =>
+        v.lang.includes("es") &&
+        (v.name.includes("Google") || v.name.includes("Microsoft"))
+    );
+
+    if (voz) speech.voice = voz;
+
+    speech.lang = "es-ES";
+    speech.pitch = 0.8;   // voz más grave = narrador
+    speech.rate = 1.05;   // más dinámica
+    speech.volume = 1;
+
+    speechSynthesis.cancel();
+    speechSynthesis.speak(speech);
+}
+
+
+// 🧾 UI RESULTADO
 const resultado = document.createElement("div");
 resultado.style.position = "absolute";
 resultado.style.top = "40%";
@@ -25,12 +51,12 @@ resultado.style.width = "100%";
 resultado.style.textAlign = "center";
 resultado.style.fontSize = "60px";
 resultado.style.fontWeight = "bold";
-resultado.style.fontFamily = "Consolas, monospace";
+resultado.style.color = "#FFD700";
 resultado.style.display = "none";
 resultado.style.zIndex = "9999";
 document.body.appendChild(resultado);
 
-// TEXTO PAUSA
+// ⏸️ PAUSA
 const pausaTexto = document.createElement("div");
 pausaTexto.innerText = "PAUSED";
 pausaTexto.style.position = "absolute";
@@ -38,21 +64,18 @@ pausaTexto.style.top = "40%";
 pausaTexto.style.width = "100%";
 pausaTexto.style.textAlign = "center";
 pausaTexto.style.fontSize = "80px";
-pausaTexto.style.fontFamily = "Consolas, monospace";
 pausaTexto.style.color = "#FFD700";
-pausaTexto.style.textShadow = "0 0 10px #FFD700";
 pausaTexto.style.display = "none";
 pausaTexto.style.zIndex = "9999";
 document.body.appendChild(pausaTexto);
 
-// HUD
-document.body.style.margin = "0";
-document.body.style.background = "#bfdfff";
 
+// HUD
 const hudVelocidad = document.getElementById("velocidad");
 const nitroFill = document.getElementById("nitroFill");
 
-// RENDER
+
+// 🎮 RENDER
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
@@ -65,8 +88,8 @@ const bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
     0.3, 0.6, 0.85
 );
-
 composer.addPass(bloomPass);
+
 
 // INIT
 cargarEntorno();
@@ -78,15 +101,24 @@ crearMeta();
 crearBotonRestart();
 crearBotonMenu(volverAlMenu);
 
+
+// VARIABLES
 let tiempo = 0;
 let carreraTerminada = false;
 let juegoIniciado = false;
 let cuentaAtras = 3;
-let modoCinematica = false;
 let modoJuego = null;
-let juegoPausado = false; 
+let modoCinematica = false;
+let juegoPausado = false;
 
-// DETECTAR ESC
+let ultimoComentario = 0;
+let ultimoComentarioIA = 0;
+let ultimoEstado = null;
+let ultimoGanador = null;
+let finalNarrado = false;
+
+
+// ⏸️ PAUSA
 window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
         juegoPausado = !juegoPausado;
@@ -94,17 +126,15 @@ window.addEventListener("keydown", (e) => {
     }
 });
 
-// CUENTA ATRÁS
+
+// ⏱️ CUENTA ATRÁS
 const salida = document.createElement("div");
 salida.style.position = "absolute";
 salida.style.top = "30%";
 salida.style.width = "100%";
 salida.style.textAlign = "center";
 salida.style.fontSize = "80px";
-salida.style.fontWeight = "bold";
-salida.style.fontFamily = "Consolas, monospace";
 salida.style.color = "#FFD700";
-salida.style.textShadow = "0 0 10px #FFD700, 0 0 20px #FFA500";
 salida.style.zIndex = "9999";
 document.body.appendChild(salida);
 
@@ -113,28 +143,29 @@ function iniciarCuentaAtras() {
 
         if (cuentaAtras > 0) {
             salida.innerText = cuentaAtras;
+            hablarPro(cuentaAtras.toString());
             cuentaAtras--;
         } else {
             salida.innerText = "GO!";
+            hablarPro("¡Arranca la carrera!");
             juegoIniciado = true;
 
-            setTimeout(() => {
-                salida.style.display = "none";
-            }, 1000);
-
+            setTimeout(() => salida.style.display = "none", 1000);
             clearInterval(intervalo);
         }
 
     }, 1000);
 }
 
-// MENÚ INICIAL
+
+// MENÚ
 crearMenu((modo) => {
     modoJuego = modo;
     iniciarCuentaAtras();
 });
 
-// VOLVER AL MENÚ
+
+// RESET
 function volverAlMenu() {
 
     carreraTerminada = false;
@@ -149,20 +180,22 @@ function volverAlMenu() {
     const coche = getCoche();
     const ia = getCocheIA();
 
+    // 🔥 RESETEAR POSICIONES
     if (coche) coche.position.set(0, 1, 5);
     if (ia) ia.position.set(2, 1, 2);
 
+    // 🔥 RECREAR MENÚ (CLAVE)
     crearMenu((modo) => {
         modoJuego = modo;
         iniciarCuentaAtras();
     });
 }
 
-// LOOP
+
+// 🔁 LOOP
 function animar() {
     requestAnimationFrame(animar);
 
-    // BLOQUEO POR PAUSA
     if (juegoPausado) {
         composer.render();
         return;
@@ -170,16 +203,60 @@ function animar() {
 
     const coche = getCoche();
     const ia = getCocheIA();
+    const meta = -275;
 
     if (juegoIniciado) {
 
-        if (!carreraTerminada) {
-            moverCoche(rampas, activarAtardecer);
+        const ahora = Date.now();
+      let evento = "carrera";
+
+if (coche && ia) {
+
+    if (coche.position.y > 1.5) {
+        evento = "rampa";
+    }
+
+    if (coche.position.z < ia.position.z) {
+        evento = "jugador lidera";
+    } else {
+        evento = "ia lidera";
+    }
+
+    if (Math.abs(coche.position.z - ia.position.z) < 5) {
+        evento = "lucha";
+    }
+
+    if (getNitro() > 80) {
+        evento = "nitro";
+
+        if (evento === "rampa") {
+    mostrarComentarioIA("🚀 ¡SUBE LA RAMPA A TODA VELOCIDAD!");
+}
+    }
+}
+
+
+        // 🧠 IA REAL (cada 4s → MUCHO MÁS FLUIDO)
+        if (ahora - ultimoComentarioIA > 2500) {
+
+            ultimoComentarioIA = ahora;
+
+           comentarCarreraIA({
+    evento,
+    posicionJugador: coche?.position.z,
+    posicionIA: ia?.position.z,
+    velocidad: getVelocidad(),
+    nitro: getNitro(),
+    enRampa: coche?.position.y > 1.5
+})
+            .then(c => {
+                mostrarComentarioIA(c);
+                hablarPro(c);
+            });
         }
 
-        if (modoJuego === "ia") {
-            moverCocheIA(rampas);
-        }
+        if (!carreraTerminada) moverCoche(rampas, activarAtardecer);
+        if (modoJuego === "ia") moverCocheIA(rampas);
     }
 
     actualizarParticulas();
@@ -192,61 +269,68 @@ function animar() {
     tiempo += 0.05;
     actualizarAgua(tiempo);
 
-    const kmh = Math.round(Math.abs(getVelocidad() * 400));
-    hudVelocidad.textContent = kmh + " km/h";
+    hudVelocidad.textContent = Math.round(getVelocidad() * 400) + " km/h";
     nitroFill.style.width = getNitro() + "%";
 
-    const meta = -275;
+    // 🏁 META
+   if (!carreraTerminada && coche && coche.position.z <= meta) {
+    resultado.innerText = "🏆 WINNER";
+    resultado.style.display = "block";
 
-    if (!carreraTerminada && coche && coche.position.z <= meta) {
-        resultado.innerText = "🏆 WINNER";
-        resultado.style.color = "#FFD700";
-        resultado.style.display = "block";
+    mostrarBotonRestart();
 
-        mostrarBotonRestart();
+    carreraTerminada = true;
+    modoCinematica = true;
 
-        coche.position.z = meta;
+    if (!finalNarrado) {
+        finalNarrado = true;
 
-        carreraTerminada = true;
-        modoCinematica = true;
+        const finalTexto = "¡VICTORIA ESPECTACULAR! ¡Una carrera absolutamente increíble!";
+        mostrarComentarioIA(finalTexto);
+        hablarPro(finalTexto);
     }
+}
 
-    if (!carreraTerminada && ia && ia.position.z <= meta) {
-        resultado.innerText = "💀 LOSER";
-        resultado.style.color = "red";
-        resultado.style.display = "block";
+if (!carreraTerminada && ia && ia.position.z <= meta) {
+    resultado.innerText = "💀 LOSER";
+    resultado.style.color = "red";
+    resultado.style.display = "block";
 
-        mostrarBotonRestart();
+    mostrarBotonRestart();
 
-        ia.position.z = meta;
+    carreraTerminada = true;
+    modoCinematica = true;
 
-        carreraTerminada = true;
-        modoCinematica = true;
+    if (!finalNarrado) {
+        finalNarrado = true;
+
+        const finalTexto = "¡La IA se lleva la victoria! ¡Qué carrera tan brutal!";
+        mostrarComentarioIA(finalTexto);
+        hablarPro(finalTexto);
     }
-
-    if (carreraTerminada) {
-        if (coche) coche.position.x += (-1.5 - coche.position.x) * 0.05;
-        if (ia) ia.position.x += (1.5 - ia.position.x) * 0.05;
-    }
-
-    if (modoCinematica) {
-
-        const objetivo = coche && coche.position.z <= meta ? coche : ia;
-
-        if (objetivo) {
-            const t = Date.now() * 0.001;
-
-            camara.position.x = objetivo.position.x + Math.sin(t) * 5;
-            camara.position.z = objetivo.position.z + Math.cos(t) * 5;
-            camara.position.y = 3;
-
-            camara.lookAt(objetivo.position);
-
-            camara.position.y += (2 - camara.position.y) * 0.05;
-        }
-    }
+}
 
     composer.render();
+}
+
+
+// 🧾 UI TEXTO
+function mostrarComentarioIA(texto) {
+    let div = document.getElementById("comentarioIA");
+
+    if (!div) {
+        div = document.createElement("div");
+        div.id = "comentarioIA";
+        div.style.position = "absolute";
+        div.style.top = "20px";
+        div.style.right = "20px";
+        div.style.color = "white";
+        div.style.background = "rgba(0,0,0,0.6)";
+        div.style.padding = "10px";
+        document.body.appendChild(div);
+    }
+
+    div.innerText = texto;
 }
 
 animar();
