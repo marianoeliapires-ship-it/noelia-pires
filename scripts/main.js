@@ -34,9 +34,9 @@ function hablarPro(texto) {
     if (voz) speech.voice = voz;
 
     speech.lang = "es-ES";
-    speech.pitch = 0.8;   // voz más grave = narrador
-    speech.rate = 1.05;   // más dinámica
-    speech.volume = 1;
+    speech.pitch = 8.5;   // voz más grave = narrador
+    speech.rate = 1.5;   // más dinámica
+    speech.volume = 2;
 
     speechSynthesis.cancel();
     speechSynthesis.speak(speech);
@@ -322,11 +322,11 @@ function mostrarComentarioIA(texto) {
         div = document.createElement("div");
         div.id = "comentarioIA";
         div.style.position = "absolute";
-        div.style.top = "20px";
-        div.style.right = "20px";
+        div.style.top = "40px";
+        div.style.right = "40px";
         div.style.color = "white";
         div.style.background = "rgba(0,0,0,0.6)";
-        div.style.padding = "10px";
+        div.style.padding = "2px";
         document.body.appendChild(div);
     }
 

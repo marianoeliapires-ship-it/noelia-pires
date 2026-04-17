@@ -21,34 +21,46 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "..", "index.html"));
 });
 
-// 🧠 IA LOCAL RÁPIDA
+// 🧠 IA LOCAL
 app.post("/ia", async (req, res) => {
 
- const prompt = `
+  console.log("📥 BODY:", req.body);
+
+  // ✅ IMPORTANTE: coger datos bien
+  const {
+    evento = "carrera",
+    posicionJugador = 0,
+    posicionIA = 0,
+    velocidad = 0,
+    nitro = 0,
+    enRampa = false
+  } = req.body || {};
+
+  const prompt = `
 Eres un narrador de carreras estilo Fórmula 1 en directo.
 
 Habla en español.
-3 o 4 palabras.
-
-Describe la acción paso a paso como si lo estuvieras viendo.
+Máximo 5 palabras.
+Frases CORTAS y COMPLETAS.
 
 Ejemplos:
-- "¡Arranca la carrera! El coche rojo acelera fuerte."
-- "Sube la rampa a toda velocidad, la IA le sigue de cerca."
-- "¡La IA adelanta! No le deja espacio."
-- "¡Qué lucha! Van pegados."
-- "¡VICTORIA del coche rojo!"
+- "¡Arranca la carrera!"
+- "El coche rojo lidera"
+- "¡IA adelanta!"
+- "Sube la rampa"
+- "¡Victoria del rojo!"
 
-Datos en tiempo real:
+Datos:
 Evento: ${evento}
-Posición jugador: ${posicionJugador}
-Posición IA: ${posicionIA}
+Jugador: ${posicionJugador}
+IA: ${posicionIA}
 Velocidad: ${velocidad}
 Nitro: ${nitro}
-Está en rampa: ${enRampa}
+Rampa: ${enRampa}
 
-Describe lo que está pasando AHORA MISMO como narrador de TV.
+Describe SOLO lo que pasa ahora.
 `;
+
   try {
 
     const response = await fetch("http://localhost:11434/api/generate", {
@@ -61,30 +73,39 @@ Describe lo que está pasando AHORA MISMO como narrador de TV.
         prompt: prompt,
         stream: false,
         options: {
-          num_predict: 60,      // 🔥 más rápido
-          temperature: 0.9
+          num_predict: 12,
+          temperature: 0.6
         }
       })
     });
 
     const data = await response.json();
 
-    const comentario = (data.response || "")
+    let comentario = (data.response || "")
       .replace(/\n/g, " ")
-      .trim() || "🔥 ¡A fondo!";
+      .trim();
+
+    // ✅ fallback SIEMPRE
+    if (!comentario) {
+      comentario = "🔥 ¡A fondo!";
+    }
+
+    console.log("🎤 IA:", comentario);
 
     res.json({ comentario });
 
   } catch (error) {
-    console.error("❌ ERROR OLLAMA:", error);
 
+    console.error("❌ ERROR IA:", error.message);
+
+    // 🔥 NUNCA romper JSON
     res.json({
-      comentario: "🔥 ¡A fondo!"
+      comentario: "🔥 ¡Carrera en marcha!"
     });
   }
 });
 
 // 🚀 iniciar
 app.listen(3000, () => {
-  console.log("🔥 Servidor IA + Juego en http://localhost:3000");
+  console.log("🔥 Servidor IA en http://localhost:3000");
 });
